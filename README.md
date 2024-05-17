@@ -30,7 +30,7 @@ Generate reports using the following methods
 
 Full or Brief Major Reports:
 
-report.full_report('brief') # Options: 'full', 'brief'
+report._full_report('brief') # Options: 'full', 'brief'
 
 Specific Month for All Years Report:
 

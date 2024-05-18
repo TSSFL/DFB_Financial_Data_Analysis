@@ -166,7 +166,16 @@ class FinancialReport:
          if self.df is None:
             print("DataFrame is not available. Please call process_data() first.")
             return
-        
+            
+         #Convert 'Date of Transaction' column to datetime
+         self.df['Date of Transaction'] = pd.to_datetime(self.df['Date of Transaction'], format='%m/%d/%Y')
+         self.df['Grouped Date'] = self.df['Date of Transaction'].dt.date
+         self.df['Grouped Date'] = self.df.groupby('Grouped Date')['Grouped Date'].transform('first')
+         self.df['Date of Transaction'] = self.df['Grouped Date']
+         self.df = self.df.sort_values('Date of Transaction')
+         self.df = self.df.reset_index(drop=True) #Maintain date order from low to highest
+         self.df = self.df.drop('Grouped Date', axis=1)
+
          #Total Lipa charges
          self.df.insert(self.df.columns.get_loc('TIGO LIPA COMM') + 1, 'TOTAL LIPA COMMISSION', self.df.loc[:, 'AIRTEL LIPA COMM':'TIGO LIPA COMM'].sum(axis=1))
          
@@ -199,6 +208,7 @@ class FinancialReport:
  
          #Compute loss/excess
          self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL LIPA COMMISSION', 'SELCOM COMM', 'TOTAL MOBILE COMMISSION', 'TOTAL BANK COMMISSION', 'ADDITIONAL CAPITAL']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE', "OWNER'S DRAW"]].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
+         
          self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
          #Expected Operating Capital
@@ -501,4 +511,3 @@ class FinancialReport:
             plt.ylabel("Form of Currency")
             plt.show()
             plt.close()
-

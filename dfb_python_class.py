@@ -204,7 +204,7 @@ class FinancialReport:
          self.df.insert(self.df.columns.get_loc('TOTAL BANK COMMISSION') + 1, 'TOTAL COMMISSION', self.df.loc[:, ['TOTAL LIPA COMMISSION', 'TOTAL MOBILE COMMISSION', 'TOTAL BANK COMMISSION']].sum(numeric_only=True, axis=1))
 
          #Actual Operating Capital
-         self.df.insert(self.df.columns.get_loc('HARD CASH') + 1, 'ACTUAL OPERATING CAPITAL', self.df.loc[:, ['TOTAL LIPA COMMISSION', 'TOTAL FLOAT', 'HARD CASH']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('HARD CASH') + 1, 'ACTUAL OPERATING CAPITAL', self.df.loc[:, ['TOTAL FLOAT', 'HARD CASH']].sum(numeric_only=True, axis=1))
  
          #Compute loss/excess
          self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL LIPA COMMISSION', 'SELCOM COMM', 'TOTAL MOBILE COMMISSION', 'TOTAL BANK COMMISSION', 'ADDITIONAL CAPITAL']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE', "OWNER'S DRAW"]].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))

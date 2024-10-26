@@ -77,7 +77,7 @@ class FinancialReport:
         
     def calculations(self, df):
         df = df.copy()
-        df.loc['COLUMN TOTALS']= df.iloc[:,np.r_[13:21, 51:95, 96:112, 113:115, 117:120]].sum(axis=0)
+        df.loc['COLUMN TOTALS']= df.iloc[:,np.r_[13:21, 51:96, 98:115, 117:120]].sum(axis=0)
         df.loc['MAXIMUM CREDITS']= df.iloc[0:-1,np.r_[2:120]].max(axis=0)
         df.loc['MINIMUM CREDITS']= df.iloc[0:-2,np.r_[2:120]].min(numeric_only=True, axis=0)
         df.loc['AVERAGE CREDITS']= df.iloc[0:-3,np.r_[2:120]].mean(numeric_only=True, axis=0).round(2)
@@ -195,19 +195,22 @@ class FinancialReport:
          self.df.insert(self.df.columns.get_loc('LETSHEGO') + 1, 'TOTAL BANK FLOAT', self.df.loc[:, 'NMB':'LETSHEGO'].sum(numeric_only=True, axis=1))
  
          #Total Expenditure
-         self.df.insert(self.df.columns.get_loc('UNFORESEEN EXPENSES') + 1, 'TOTAL EXPENDITURE', self.df.loc[:, 'ELECTRICITY BILL':'UNFORESEEN EXPENSES'].sum(numeric_only=True, axis=1))
- 
+         #self.df.insert(self.df.columns.get_loc('RENT') + 1, 'TOTAL EXPENDITURE', self.df.loc[:, 'ELECTRICITY BILL':'RENT'].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('RENT') + 1, 'TOTAL EXPENDITURE', self.df.loc[:, 'ELECTRICITY BILL':'RENT'].sum(numeric_only=True, axis=1) - self.df['ADDITIONAL CAPITAL']) 
          #Total float
          self.df.insert(self.df.columns.get_loc('TOTAL BANK COMMISSION') + 1, 'TOTAL FLOAT', self.df.loc[:, ['SELCOM', 'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT']].sum(numeric_only=True, axis=1))
 
          #Total Commission
          self.df.insert(self.df.columns.get_loc('TOTAL BANK COMMISSION') + 1, 'TOTAL COMMISSION', self.df.loc[:, ['TOTAL LIPA COMMISSION', 'TOTAL MOBILE COMMISSION', 'TOTAL BANK COMMISSION']].sum(numeric_only=True, axis=1))
+         
+         #Total Salaries
+         self.df.insert(self.df.columns.get_loc('SALARIES') + 1, 'TOTAL SALARIES', self.df.loc[:, 'OWNER\'S DRAW':'SALARIES'].sum(numeric_only=True, axis=1))
 
          #Actual Operating Capital
          self.df.insert(self.df.columns.get_loc('HARD CASH') + 1, 'ACTUAL OPERATING CAPITAL', self.df.loc[:, ['TOTAL FLOAT', 'HARD CASH']].sum(numeric_only=True, axis=1))
  
          #Compute loss/excess
-         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL LIPA COMMISSION', 'SELCOM COMM', 'TOTAL MOBILE COMMISSION', 'TOTAL BANK COMMISSION', 'ADDITIONAL CAPITAL']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE', "OWNER'S DRAW"]].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
+         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL LIPA COMMISSION', 'SELCOM COMM', 'TOTAL MOBILE COMMISSION', 'TOTAL BANK COMMISSION', 'ADDITIONAL CAPITAL']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
          
          self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
@@ -224,13 +227,18 @@ class FinancialReport:
 
          #Total cash inflow
          self.df.insert(self.df.columns.get_loc('HARD CASH') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'ADDITIONAL CAPITAL', 'EXCESS']].sum(numeric_only=True, axis=1))
-
-         #Total Salaries
-         self.df.insert(self.df.columns.get_loc('SALARIES') + 1, 'TOTAL SALARIES', self.df.loc[:, 'OWNER\'S DRAW':'SALARIES'].sum(numeric_only=True, axis=1))
          #Total cash outflow
          self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE', 'TOTAL SALARIES', 'RENT']].sum(numeric_only=True, axis=1))
-          
          
+         #Move HARD CASH column next to the TOTAL FLOAT column
+         self.df = self.df.reindex(columns=[col for col in self.df.columns if col != 'HARD CASH'][:self.df.columns.get_loc('TOTAL FLOAT') + 1] + ['HARD CASH'] + [col for col in self.df.columns if col != 'HARD CASH'][self.df.columns.get_loc('TOTAL FLOAT') + 1:])
+         
+         #Move ADDITIONAL CAPITAL column next to the TOTAL COMMISSION column
+         self.df = self.df.reindex(columns=[col for col in self.df.columns if col != 'ADDITIONAL CAPITAL'][:self.df.columns.get_loc('TOTAL COMMISSION') + 1] + ['ADDITIONAL CAPITAL'] + [col for col in self.df.columns if col != 'ADDITIONAL CAPITAL'][self.df.columns.get_loc('TOTAL COMMISSION') + 1:])
+         
+         #Move TOTAL SALARIES column next to the RENT column
+         self.df = self.df.reindex(columns=[col for col in self.df.columns if col != 'TOTAL SALARIES'][:self.df.columns.get_loc('RENT') + 1] + ['TOTAL SALARIES'] + [col for col in self.df.columns if col != 'TOTAL SALARIES'][self.df.columns.get_loc('RENT') + 1:])
+
          df = self.calculations(self.df)
          df = df.map(self.format_data)
          df = self.date_time(df)
@@ -511,3 +519,4 @@ class FinancialReport:
             plt.ylabel("Form of Currency")
             plt.show()
             plt.close()
+

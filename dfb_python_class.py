@@ -77,10 +77,17 @@ class FinancialReport:
         
     def calculations(self, df):
         df = df.copy()
-        df.loc['COLUMN TOTALS']= df.iloc[:,np.r_[13:21, 51:96, 98:115, 117:120]].sum(axis=0)
-        df.loc['MAXIMUM CREDITS']= df.iloc[0:-1,np.r_[2:120]].max(axis=0)
-        df.loc['MINIMUM CREDITS']= df.iloc[0:-2,np.r_[2:120]].min(numeric_only=True, axis=0)
-        df.loc['AVERAGE CREDITS']= df.iloc[0:-3,np.r_[2:120]].mean(numeric_only=True, axis=0).round(2)
+        #df.loc['COLUMN TOTALS']= df.iloc[:,np.r_[13:21, 51:96, 98:115, 117:120]].sum(axis=0)
+        column_ranges = [('AIRTEL LIPA COMM', 'TOTAL TRANSFER FEE'), ('SELCOM COMM', 'ADDITIONAL CAPITAL'), ('ELECTRICITY BILL', 'TOTAL CASH OUTFLOW'), ('EXCESS', 'EXCESS/LOSS')]
+        #Sum over the specified column ranges
+        columns_to_sum = [col for start, end in column_ranges for col in df.loc[:, start:end]]
+        df.loc['COLUMN TOTALS'] = df.loc[:, columns_to_sum].sum(axis=0)
+        #df.loc['MAXIMUM CREDITS']= df.iloc[0:-1,np.r_[2:120]].max(axis=0)
+        
+        #Use iloc for row slicing and loc for column slicing
+        df.loc['MAXIMUM CREDITS'] = df.iloc[0:-1].loc[:, 'SELCOM':'EXCESS/LOSS'].max(axis=0)
+        df.loc['MINIMUM CREDITS']= df.iloc[0:-2].loc[:, 'SELCOM':'EXCESS/LOSS'].min(numeric_only=True, axis=0)
+        df.loc['AVERAGE CREDITS']= df.iloc[0:-3].loc[:, 'SELCOM':'EXCESS/LOSS'].mean(numeric_only=True, axis=0).round(2)
         
         return df
         
@@ -141,7 +148,8 @@ class FinancialReport:
             file.write(df_html)
             
         return df_html
-    
+        
+    #This method is for brief report - select a df subset
     def subset_df(self, df):
         subset_df = df.drop(columns=df.loc[:, 'AIRTEL MONEY':'AZAM PESA'].columns
                     .append(df.loc[:, 'AIRTEL LIPA COMM':'TIGO LIPA COMM'].columns)
@@ -228,7 +236,7 @@ class FinancialReport:
          #Total cash inflow
          self.df.insert(self.df.columns.get_loc('HARD CASH') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'ADDITIONAL CAPITAL', 'EXCESS']].sum(numeric_only=True, axis=1))
          #Total cash outflow
-         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE', 'TOTAL SALARIES', 'RENT']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TOTAL TRANSFER FEE', 'TOTAL EXPENDITURE']].sum(numeric_only=True, axis=1))
          
          #Move HARD CASH column next to the TOTAL FLOAT column
          self.df = self.df.reindex(columns=[col for col in self.df.columns if col != 'HARD CASH'][:self.df.columns.get_loc('TOTAL FLOAT') + 1] + ['HARD CASH'] + [col for col in self.df.columns if col != 'HARD CASH'][self.df.columns.get_loc('TOTAL FLOAT') + 1:])
@@ -316,10 +324,13 @@ class FinancialReport:
         df = df[['DAY NAME'] + [col for col in df.columns if col != 'DAY NAME']]
         
         #df = self.calculations(df)
-        df.loc['COLUMN TOTALS']= df.iloc[:,np.r_[14:22, 52:96, 97:113, 114:116, 118:121]].sum(axis=0)
-        df.loc['MAXIMUM CREDITS']= df.iloc[0:-1,np.r_[3:121]].max(axis=0)
-        df.loc['MINIMUM CREDITS']= df.iloc[0:-2,np.r_[3:121]].min(numeric_only=True, axis=0)
-        df.loc['AVERAGE CREDITS']= df.iloc[0:-3,np.r_[3:121]].mean(numeric_only=True, axis=0).round(2)
+        column_ranges = [('AIRTEL LIPA COMM', 'TOTAL TRANSFER FEE'), ('SELCOM COMM', 'ADDITIONAL CAPITAL'), ('ELECTRICITY BILL', 'TOTAL CASH OUTFLOW'), ('EXCESS', 'EXCESS/LOSS')]
+        #Sum over the specified column ranges
+        columns_to_sum = [col for start, end in column_ranges for col in df.loc[:, start:end]]
+        df.loc['COLUMN TOTALS'] = df.loc[:, columns_to_sum].sum(axis=0)
+        df.loc['MAXIMUM CREDITS']= df.iloc[0:-1].loc[:, 'SELCOM':'EXCESS/LOSS'].max(axis=0)
+        df.loc['MINIMUM CREDITS']= df.iloc[0:-2].loc[:, 'SELCOM':'EXCESS/LOSS'].min(numeric_only=True, axis=0)
+        df.loc['AVERAGE CREDITS']= df.iloc[0:-3].loc[:, 'SELCOM':'EXCESS/LOSS'].mean(numeric_only=True, axis=0).round(2)
         df = df.map(self.format_data)
         df = self.date_time(df)
         #Report
@@ -352,10 +363,13 @@ class FinancialReport:
         df = df[['DAY NAME'] + [col for col in df.columns if col != 'DAY NAME']]
         
         #df = self.calculations(df) - right shift by +1
-        df.loc['COLUMN TOTALS']= df.iloc[:,np.r_[14:22, 52:96, 97:113, 114:116, 118:121]].sum(axis=0)
-        df.loc['MAXIMUM CREDITS']= df.iloc[0:-1,np.r_[3:121]].max(axis=0)
-        df.loc['MINIMUM CREDITS']= df.iloc[0:-2,np.r_[3:121]].min(numeric_only=True, axis=0)
-        df.loc['AVERAGE CREDITS']= df.iloc[0:-3,np.r_[3:121]].mean(numeric_only=True, axis=0).round(2)
+        column_ranges = [('AIRTEL LIPA COMM', 'TOTAL TRANSFER FEE'), ('SELCOM COMM', 'ADDITIONAL CAPITAL'), ('ELECTRICITY BILL', 'TOTAL CASH OUTFLOW'), ('EXCESS', 'EXCESS/LOSS')]
+        #Sum over the specified column ranges
+        columns_to_sum = [col for start, end in column_ranges for col in df.loc[:, start:end]]
+        df.loc['COLUMN TOTALS PLUS'] = df.loc[:, columns_to_sum].sum(axis=0)
+        df.loc['MAXIMUM CREDITS']= df.iloc[0:-1].loc[:, 'SELCOM':'EXCESS/LOSS'].max(axis=0)
+        df.loc['MINIMUM CREDITS']= df.iloc[0:-2].loc[:, 'SELCOM':'EXCESS/LOSS'].min(numeric_only=True, axis=0)
+        df.loc['AVERAGE CREDITS']= df.iloc[0:-3].loc[:, 'SELCOM':'EXCESS/LOSS'].mean(numeric_only=True, axis=0).round(2)
         df = df.map(self.format_data)
         df = self.date_time(df)
         

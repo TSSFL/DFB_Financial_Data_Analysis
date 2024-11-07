@@ -45,9 +45,8 @@ class FinancialReport:
     def _get_data_from_google_drive(self):
         print(
         "🌟 Welcome to TSSFL Technology Stack! 🚀\n"
-        "Embark on a journey of financial insights as we process your data\n"
-        "with precision and elegance. Please hold on while we craft\n"
-        "your comprehensive report! 📊✨")
+        "Embark on a journey of financial insights as we process your data with precision and elegance.\n"
+        "Please hold on while we craft your comprehensive report! 📊✨")
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
         #Define the scope
         scope = ['https://www.googleapis.com/auth/spreadsheets'] 

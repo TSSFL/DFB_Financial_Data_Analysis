@@ -205,7 +205,7 @@ class FinancialReport:
          self.df.columns = self.df.columns.str.strip().str.replace(r'\s+', ' ', regex=True)
 
          #Base keywords
-         base_key = ['AIRTEL MONEY ', 'AIRTEL LIPA ', 'VODA LIPA ', 'TIGO PESA ', 'M PESA ', 'HALO PESA ', 'CRDB BANK ', 'SELCOM ']
+         base_key = ['AIRTEL MONEY ', 'AIRTEL LIPA ', 'VODA LIPA ', 'TIGO PESA ', 'M PESA ', 'HALO PESA ', 'CRDB BANK ', 'NMB BANK ', 'NBC BANK ', 'EQUITY BANK ', 'SELCOM ']
  
          #Initialize the grouped column list
          grouped_column_list = []

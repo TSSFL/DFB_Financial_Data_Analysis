@@ -45,7 +45,8 @@ class FinancialReport:
     def _get_data_from_google_drive(self):
         print(
         "🌟 Welcome to TSSFL Technology Stack! 🚀\n"
-        "Embark on a journey of financial insights as we process your data with precision and elegance.\n"
+        "Embark on a journey of financial insights as we\n" 
+        "process your data with precision and elegance.\n"
         "Please hold on while we craft your comprehensive report! 📊✨")
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
         #Define the scope
@@ -190,7 +191,23 @@ class FinancialReport:
          if self.df is None:
             print("DataFrame is not available. Please call process_data() first.")
             return
+         #Handle empty strings
+         #Identify numerical columns (exclude columns containing specific keywords)
+         exclude_keywords = ["Timestamp", "Submitter", "Transaction", "Details", "INCIDENTS"]
+         numerical_cols = [col for col in self.df.columns 
+                  if not any(keyword in col for keyword in exclude_keywords)]
 
+         #Convert numerical columns to numeric type, handling errors
+         for col in numerical_cols:
+             try:
+                 #Attempt direct conversion to numeric
+                 self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0).astype(float)  #or float if needed
+
+             except (TypeError, ValueError): #More robust handling if necessary (for mixed data types within a column)
+                 self.df[col] = self.df[numeric_cols].apply(lambda col: col.apply(lambda x: float(pd.to_numeric(x, errors='coerce')) if pd.notnull(x) else 0.0))
+                 self.df[col] = self.df[col].fillna(0).astype(float) #fillna(0) before astype(float) or it will raise an error.
+
+         
          #Convert 'Date of Transaction' column to datetime
          self.df['Date of Transaction'] = pd.to_datetime(self.df['Date of Transaction'], format='%m/%d/%Y')
          self.df['Grouped Date'] = self.df['Date of Transaction'].dt.date
@@ -257,23 +274,9 @@ class FinancialReport:
                     "AGENCY", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction"]
                     
          #Columns to sum for "NORMAL MOBILE FLOAT TOTAL"
-         normal_mobile_columns = [col for col in self.df.columns if not any(keyword in col for keyword in exclude_keywords)]
-         #Calculate the sum of the
-         try:  #Enclose in a try-except block
-                #Convert to numeric, coercing non-numeric values to NaN
-                self.df[normal_mobile_columns] = self.df[normal_mobile_columns].apply(pd.to_numeric, errors='coerce')  
-
-                self.df['TOTAL NORMAL MOBILE FLOAT'] = self.df[normal_mobile_columns].sum(axis=1)
-
-         except (TypeError, ValueError) as e:
-                print(f"Error calculating 'TOTAL NORMAL MOBILE COMMISSION': {e}") #Handle the error as needed:
-                #1. Print problematic rows:
-                problematic_rows = self.df[self.df[mobile_comm_cols].applymap(lambda x: isinstance(x, str)).any(axis=1)]
-                print("Problematic rows:")
-                print(problematic_rows[mobile_comm_cols])
-                #2.  Fill with 0 or NaN:
-                self.df['TOTAL NORMAL MOBILE FLOAT'] = np.nan # Or 0 if you prefer  
-             
+         normal_mobile_columns = [col for col in self.df.columns if not any(keyword in col for keyword in exclude_keywords)]  
+         if normal_mobile_columns:
+                self.df['TOTAL NORMAL MOBILE FLOAT'] = self.df[normal_mobile_columns].sum(axis=1) 
          else: 
              print("No columns found matching the specified criteria.")          
           
@@ -335,21 +338,7 @@ class FinancialReport:
          #NORMAL MOBILE COMMISSION TOTAL
          mobile_comm_cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", "AGENCY"])]
          if mobile_comm_cols:
-            try:  #Enclose in a try-except block
-                #Convert to numeric, coercing non-numeric values to NaN
-                self.df[mobile_comm_cols] = self.df[mobile_comm_cols].apply(pd.to_numeric, errors='coerce')  
-
-                self.df['TOTAL NORMAL MOBILE COMMISSION'] = self.df[mobile_comm_cols].sum(axis=1)
-
-            except (TypeError, ValueError) as e:
-                print(f"Error calculating 'TOTAL NORMAL MOBILE COMMISSION': {e}")
-                #Handle the error as needed:
-                #1. Print problematic rows:
-                problematic_rows = self.df[self.df[mobile_comm_cols].applymap(lambda x: isinstance(x, str)).any(axis=1)]
-                print("Problematic rows:")
-                print(problematic_rows[mobile_comm_cols])
-                #2.  Fill with 0 or NaN:
-                self.df['TOTAL NORMAL MOBILE COMMISSION'] = np.nan # Or 0 if you prefer
+             self.df['TOTAL NORMAL MOBILE COMMISSION'] = self.df[mobile_comm_cols].sum(axis=1)
          else:
              print("No Matching columns.")
  
@@ -761,4 +750,3 @@ class FinancialReport:
             plt.ylabel("POS/AGENCY")
             plt.show()
             plt.close()
-

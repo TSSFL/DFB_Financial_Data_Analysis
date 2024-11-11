@@ -204,7 +204,7 @@ class FinancialReport:
                  self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0).astype(float)  #or float if needed
 
              except (TypeError, ValueError): #More robust handling if necessary (for mixed data types within a column)
-                 self.df[col] = self.df[numeric_cols].apply(lambda col: col.apply(lambda x: float(pd.to_numeric(x, errors='coerce')) if pd.notnull(x) else 0.0))
+                 self.df[col] = self.df[col].apply(lambda col: col.apply(lambda x: float(pd.to_numeric(x, errors='coerce')) if pd.notnull(x) else 0.0))
                  self.df[col] = self.df[col].fillna(0).astype(float) #fillna(0) before astype(float) or it will raise an error.
 
          
@@ -278,7 +278,7 @@ class FinancialReport:
          if normal_mobile_columns:
                 self.df['TOTAL NORMAL MOBILE FLOAT'] = self.df[normal_mobile_columns].sum(axis=1) 
          else: 
-             print("No columns found matching the specified criteria.")          
+             print("TOTAL NORMAL MOBILE FLOAT: No columns found")          
           
          #SUPER AGENT MOBILE FLOAT TOTAL
          #Keywords to exclude
@@ -295,7 +295,7 @@ class FinancialReport:
          if superagent_mobile_columns:  # Check if any columns match the criteria
              self.df['TOTAL SUPERAGENT MOBILE FLOAT'] = self.df[superagent_mobile_columns].sum(axis=1)
          else:
-             print("No columns found matching the specified criteria.")
+             print("TOTAL SUPERAGENT MOBILE FLOAT: No columns found")
              
          #LIPA MOBILE FLOAT TOTAL
          #Keywords to exclude
@@ -312,91 +312,91 @@ class FinancialReport:
          if lipa_mobile_columns:  # Check if any columns match the criteria
              self.df['TOTAL LIPA MOBILE FLOAT'] = self.df[lipa_mobile_columns].sum(axis=1)
          else:
-             print("No columns found matching the specified criteria.")
+             print("TOTAL LIPA MOBILE FLOA: No columns found")
        
          #TOTAL SELCOM FLOAT
          selcom_cols = [col for col in self.df.columns if "SELCOM" in col and all(kw not in col for kw in ["COMM", "TOTAL"])]
          if selcom_cols:
              self.df['SELCOM FLOAT TOTAL'] = self.df[selcom_cols].sum(axis=1)  
          else:
-             print("No matching columns.")
+             print("SELCOM FLOAT TOTAL: No matching columns")
  
          #NORMAL BANK FLOAT TOTAL
          bank_cols = [col for col in self.df.columns if "BANK" in col and all(kw not in col for kw in ["SUPERAGENT", "TOTAL", "COMM"])]
          if bank_cols:
              self.df['TOTAL NORMAL BANK FLOAT'] = self.df[bank_cols ].sum(axis=1)   
          else:
-             print("No matching columns.")
+             print("TOTAL NORMAL BANK FLOAT: No matching columns")
  
          #SUPERAGENT BANK FLOAT TOTAL
          sup_bank_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "SUPERAGENT"]) and all(kw not in col for kw in ["TOTAL", "COMM"])]
          if sup_bank_cols:
              self.df['TOTAL SUPERAGENT BANK FLOAT'] = self.df[sup_bank_cols].sum(axis=1) 
          else:
-             print("No Matching columns. Column not added")
+             print("TOTAL SUPERAGENT BANK FLOAT: No Matching columns")
 
          #NORMAL MOBILE COMMISSION TOTAL
          mobile_comm_cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", "AGENCY"])]
          if mobile_comm_cols:
              self.df['TOTAL NORMAL MOBILE COMMISSION'] = self.df[mobile_comm_cols].sum(axis=1)
          else:
-             print("No Matching columns.")
+             print("TOTAL NORMAL MOBILE COMMISSION: No Matching columns")
  
          #SUPERAGENT MOBILE COMMISSION TOTAL
          sup_mobile_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["COMM", "SUPERAGENT"]) and all(kw not in col for kw in ["BANK", "LIPA", "TOTAL", "SELCOM"])]
          if sup_mobile_comm_cols:
              self.df['TOTAL SUPERAGENT MOBILE COMMISSION'] = self.df[sup_mobile_comm_cols ].sum(axis=1)   
          else:
-             print("No Matching columns.")
+             print("TOTAL NORMAL MOBILE COMMISSION: No Matching columns")
 
          #LIPA MOBILE COMMISSION TOTAL
          lipa_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["LIPA", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if lipa_comm_cols:
              self.df['TOTAL LIPA MOBILE COMMISSION'] = self.df[lipa_comm_cols].sum(axis=1)   
          else:
-             print("No Matching columns.")
+             print("TOTAL LIPA MOBILE COMMISSION: No Matching columns")
 
          #TOTAL SELCOM COMMISSION
          selcom_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["SELCOM", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if selcom_comm_cols:
              self.df['TOTAL SELCOM COMMISSION'] = self.df[selcom_comm_cols].sum(axis=1)   
          else:
-             print("No Matching columns.")
+             print("TOTAL SELCOM COMMISSION: No Matching columns")
 
          #NORMAL BANK COMMISSION TOTAL
          bank_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "COMM"]) and all(kw not in col for kw in ["SUPERAGENT", "TOTAL"])]
          if bank_comm_cols:
              self.df['TOTAL NORMAL BANK COMMISSION'] = self.df[bank_comm_cols].sum(axis=1)   
          else:
-             print("No Matching columns. Column not added")
+             print("TOTAL NORMAL BANK COMMISSION: No Matching columns")
 
          #SUPERAGENT BANK COMMISSION TOTAL
          sup_bank_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "SUPERAGENT", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if sup_bank_comm_cols:
              self.df['TOTAL SUPERAGENT BANK COMMISSION'] = self.df[sup_bank_comm_cols].sum(axis=1)
          else:
-             print("No matching columns. Column not added.") 
+             print("TOTAL SUPERAGENT BANK COMMISSION: No matching columns") 
     
          #TOTAL MOBILE COMMISSION
          cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "TOTAL", "SELCOM", "AGENCY"])]
          if cols: 
              self.df['TOTAL MOBILE COMMISSION'] = self.df[cols].sum(axis=1)
          else: 
-             print("No Matching columns. Column not added.")
+             print("TOTAL MOBILE COMMISSION: No Matching columns")
     
          #TOTAL BANK COMMISSION
          cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if cols: 
              self.df['TOTAL BANK COMMISSION'] = self.df[cols].sum(axis=1)
          else: 
-             print("No Matching columns. Column not added.")
+             print("TOTAL BANK COMMISSION: No Matching columns")
     
          #TOTAL COMMISSION
          cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["TOTAL"])]
          if cols: 
              self.df['TOTAL COMMISSION'] = self.df[cols].sum(axis=1)
          else: 
-             print("No Matching columns. Column not added.")
+             print("TOTAL COMMISSION: No Matching columns")
     
          #TOTAL MOBILE FLOAT
          cols = [col for col in self.df.columns if not any(kw in col for kw in ["BANK", "TOTAL", "COMM", "SELCOM", "AGENCY", 
@@ -404,21 +404,21 @@ class FinancialReport:
          if cols:
              self.df['TOTAL MOBILE FLOAT'] = self.df[cols].sum(axis=1)
          else:
-             print("No Matching columns. Column not added.")
+             print("TOTAL MOBILE FLOAT: No Matching columns")
     
          #TOTAL BANK FLOAT
          cols = [col for col in self.df.columns if "BANK" in col and all(kw not in col for kw in ["TOTAL", "COMM"])]
          if cols: 
              self.df['TOTAL BANK FLOAT'] = self.df[cols].sum(axis=1)
          else: 
-             print("No Matching columns. Column not added.")
+             print("TOTAL BANK FLOAT: No Matching columns")
     
          #TOTAL FLOAT
          cols = [col for col in self.df.columns if not any(keyword in col for keyword in ["COMM", "TOTAL", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction"])]
          if cols: 
              self.df['TOTAL FLOAT'] = self.df[cols].sum(axis=1)
          else: 
-             print("No Matching columns. Column not added.")
+             print("TOTAL FLOAT: No Matching columns")
     
          #Calculate the sum of the specified columns
          self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
@@ -612,16 +612,17 @@ class FinancialReport:
             df_selected = filtered_df.sample(n=1)
 
         print("Number of duplicate rows found:", duplicate_count)
-            
+        
+        #Filter or subset the df to exclude columns names with the given keywords
+        df_selected = df_selected[[col for col in df_selected.columns if not any(keyword in col for keyword in ["Timestamp", "Submitter", "Transaction", "Details", "INCIDENTS"])]]
         df = df_selected.T
         df.columns = ['Amount']
         #Reset the index and name the index column
         df.reset_index(inplace=True)
-        df.rename(columns={'index': 'POS/AGENCY'}, inplace=True)
+        df.rename(columns={'index': 'Description'}, inplace=True)
         
         df = df[~((df['Amount'] == 0) | (df['Amount'].isna()) | (df['Amount'].apply(lambda x: isinstance(x, str))))]
-        #df.loc['TOTAL AMOUNT'] = df.iloc[:, np.r_[1]].sum(axis=0)
-        
+            
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
         
@@ -629,7 +630,7 @@ class FinancialReport:
         
         with open("Compact_Report.html","w+") as file:
             file.write(table)
-        HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
+        #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
         
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
@@ -650,10 +651,10 @@ class FinancialReport:
         if report_type == 'top':
             #Plot 1
             df_sorted = df.sort_values('Amount',ascending=False)
-            #df_sorted['POS/AGENCY'] = df_sorted['POS/AGENCY'].str.wrap(13)  #Wrap at 13 character
+            #df_sorted['Description'] = df_sorted['Description'].str.wrap(13)  #Wrap at 13 character
             #Top ten highest amount
             plt.figure(figsize=(12, 8), tight_layout=True)
-            sns.barplot(x=df_sorted['Amount'].head(10),y=df_sorted['POS/AGENCY'].head(10),data=df_sorted, color="yellowgreen")
+            sns.barplot(x=df_sorted['Amount'].head(10),y=df_sorted['Description'].head(10),data=df_sorted, color="yellowgreen")
             plt.xticks(rotation=90)
             plt.title("Ten Highest Amounts")
             for i, v in enumerate(df_sorted['Amount'].head(10)):
@@ -664,23 +665,23 @@ class FinancialReport:
             #plt.text(0.02, 0.5, textstr, fontsize=14, transform=plt.gcf().transFigure)
             plt.gcf().text(0.7, 0.3, textstr, fontsize=14, color='green') # (0,0) is bottom left, (1,1) is top right
             plt.xlabel("Amount")
-            plt.ylabel("POS/AGENCY")
+            plt.ylabel("Description")
             plt.show()
             plt.close()
             
             #Plot 2
             df_sorted = df.sort_values('Amount',ascending=False)
-            df_sorted['POS/AGENCY'] = df_sorted['POS/AGENCY'].str.wrap(13)
+            df_sorted['Description'] = df_sorted['Description'].str.wrap(13)
             #Top ten highest amounts
-            plt.figure(figsize=(12,10), tight_layout=True)
-            sns.barplot(x=df_sorted['POS/AGENCY'].head(10), y=df_sorted['Amount'].head(10),data=df_sorted, color="yellowgreen")
+            plt.figure(figsize=(12, 10), tight_layout=True)
+            sns.barplot(x=df_sorted['Description'].head(10), y=df_sorted['Amount'].head(10),data=df_sorted, color="yellowgreen")
             plt.xticks(rotation=45, ha='center', va='top')
             plt.title("Ten Highest Amounts", y = 1.08)
             xlocs, xlabs = plt.xticks()
             for i, v in enumerate(df_sorted['Amount'].head(10)):
                 plt.text(xlocs[i]-0.1, v + 0.05, str(round(v, 4)), color='red', va="center", rotation=45)
             plt.gcf().text(0.7, 0.7, textstr, fontsize=14, color='green')
-            plt.xlabel("POS/AGENCY")
+            plt.xlabel("Description")
             plt.ylabel("Amount")
             plt.show()
             plt.close()
@@ -691,40 +692,41 @@ class FinancialReport:
             vh = 100
             df_sorted = df.copy().sort_values('Amount',ascending=True)
             vf = 0.05*df_sorted['Amount'].head(10).min()
-            df_sorted['POS/AGENCY'] = df_sorted['POS/AGENCY'].str.wrap(13)
+            df_sorted['Description'] = df_sorted['Description'].str.wrap(13)
             plt.figure(figsize=(12,10), tight_layout=True)
-            sns.barplot(x=df_sorted['Amount'].head(10),y=df_sorted['POS/AGENCY'].head(10),data=df_sorted, color="cadetblue")
+            sns.barplot(x=df_sorted['Amount'].head(10),y=df_sorted['Description'].head(10),data=df_sorted, color="cadetblue")
             plt.xticks(rotation=90)
             plt.title("Ten Lowest Amounts")
             for i, v in enumerate(df_sorted['Amount'].head(10)):
                 plt.text(v + vh, i, str(round(v, 4)), color='crimson', va="center") #teal
             plt.gcf().text(0.7, 0.7, textstr, fontsize=14, color='green')
             plt.xlabel("Amount")
-            plt.ylabel("POS/AGENCY")
+            plt.ylabel("Description")
             plt.show()
             plt.close()
             
             #Plot 2
             df_sorted = df.sort_values('Amount',ascending=True)
-            df_sorted['POS/AGENCY'] = df_sorted['POS/AGENCY'].str.wrap(13)
+            df_sorted['Description'] = df_sorted['Description'].str.wrap(13)
             plt.figure(figsize=(12,10), tight_layout=True)
-            sns.barplot(x=df_sorted['POS/AGENCY'].head(10), y=df_sorted['Amount'].head(10),data=df_sorted, color="cadetblue")
+            sns.barplot(x=df_sorted['Description'].head(10), y=df_sorted['Amount'].head(10),data=df_sorted, color="cadetblue")
             plt.xticks(rotation=45, ha='center', va='top')
             plt.title("Ten Lowest Amounts", y = 1.0)
             xlocs, xlabs = plt.xticks()
             for i, v in enumerate(df_sorted['Amount'].head(10)):
                 plt.text(xlocs[i]-0.0, v+400, str(round(v, 4)), color='crimson', va="center", rotation=90)
             plt.gcf().text(0.2, 0.7, textstr, fontsize=14, color='green')
-            plt.xlabel("POS/AGENCY")
+            plt.xlabel("Description")
             plt.ylabel("Amount")
             plt.show()
             plt.close()
-        else:
+            
+        elif report_type == 'ascend':
             #Full report
             #Plot 1
             df_sorted = df.sort_values('Amount',ascending=True)
-            plt.figure(figsize=(12,10), tight_layout=True)
-            sns.barplot(x=df_sorted['Amount'],y=df_sorted['POS/AGENCY'],data=df_sorted, color="deepskyblue")
+            plt.figure(figsize=(12,20), tight_layout=True)
+            sns.barplot(x=df_sorted['Amount'],y=df_sorted['Description'],data=df_sorted, color="deepskyblue")
             plt.xticks(rotation=90)
             plt.title("Amounts in Ascending Order")
             for i, v in enumerate(df_sorted['Amount']):
@@ -732,21 +734,23 @@ class FinancialReport:
                 plt.text(v + vh, i, str((i+1)), color='black', va="center")
             plt.gcf().text(0.69, 0.7, textstr, fontsize=14, color='green')
             plt.xlabel("Amount")
-            plt.ylabel("POS/AGENCY")
+            plt.ylabel("Description")
             plt.show()
             plt.close()
             
-            #Plot 2
+        elif report_type == 'descend': #Plot 2
             df_sorted = df.sort_values('Amount',ascending=False)
-            plt.figure(figsize=(12,10), tight_layout=True)
-            sns.barplot(x=df_sorted['Amount'],y=df_sorted['POS/AGENCY'],data=df_sorted, color="deepskyblue")
+            plt.figure(figsize=(12,20), tight_layout=True)
+            sns.barplot(x=df_sorted['Amount'],y=df_sorted['Description'],data=df_sorted, color="deepskyblue")
             plt.xticks(rotation=90)
             plt.title("Amounts in Descending Order")
             for i, v in enumerate(df_sorted['Amount']):
                 plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
-                plt.text(v+vh, i, str(i+1), color='black', va="center")
+                #plt.text(v+vh, i, str(i+1), color='black', va="center")
             plt.gcf().text(0.7, 0.3, textstr, fontsize=14, color='green')
             plt.xlabel("Amount")
-            plt.ylabel("POS/AGENCY")
+            plt.ylabel("Description")
             plt.show()
             plt.close()
+        else:
+            pass #Do nothing

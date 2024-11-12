@@ -13,6 +13,8 @@ from koboextractor import KoboExtractor
 
 import regex as re
 
+from datetime import date, datetime, timezone, timedelta
+
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -599,7 +601,11 @@ class FinancialReport:
         #top_ten, lower_ten, full
         df = self.df
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%m/%d/%Y')
+        most_recent_date = df['Date of Transaction'].max()
         df = self.date_time(df)
+        
+        #Extract the most recent date
+        print("Recent Date:", most_recent_date)
         
         date = date
         #df = df.tail(1) if date is None else df[df['Date of Transaction'] == date].sample(n=1)
@@ -608,8 +614,14 @@ class FinancialReport:
             df_selected = df.tail(1)
         else:
             filtered_df = df[df['Date of Transaction'] == date]
-            duplicate_count = filtered_df.duplicated(subset='Date of Transaction').sum()
-            df_selected = filtered_df.sample(n=1)
+            if filtered_df.empty:
+                #Handle the case where there are no transactions on the specified date.
+                #For example, you might set df_selected to an empty DataFrame or raise an exception.
+                df_selected = pd.DataFrame()  # Or raise an appropriate exception
+                print(f"No transactions found for date: {date}")
+            else:
+                duplicate_count = filtered_df.duplicated(subset='Date of Transaction').sum()
+                df_selected = filtered_df.sample(n=1)
 
         print("Number of duplicate rows found:", duplicate_count)
         
@@ -728,7 +740,7 @@ class FinancialReport:
             plt.figure(figsize=(12,20), tight_layout=True)
             sns.barplot(x=df_sorted['Amount'],y=df_sorted['Description'],data=df_sorted, color="deepskyblue")
             plt.xticks(rotation=90)
-            plt.title("Amounts in Ascending Order")
+            plt.title("Amounts in TZS")
             for i, v in enumerate(df_sorted['Amount']):
                 plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
                 plt.text(v + vh, i, str((i+1)), color='black', va="center")
@@ -743,11 +755,28 @@ class FinancialReport:
             plt.figure(figsize=(12,20), tight_layout=True)
             sns.barplot(x=df_sorted['Amount'],y=df_sorted['Description'],data=df_sorted, color="deepskyblue")
             plt.xticks(rotation=90)
-            plt.title("Amounts in Descending Order")
+            plt.title("Amounts in TZS")
             for i, v in enumerate(df_sorted['Amount']):
                 plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
                 #plt.text(v+vh, i, str(i+1), color='black', va="center")
-            plt.gcf().text(0.7, 0.3, textstr, fontsize=14, color='green')
+                
+            #Define the GMT+3 timezone
+            gmt_plus_3 = timezone(timedelta(hours=3))
+
+            #Get the current time in GMT+3
+            now = datetime.now(gmt_plus_3)
+            #Generate the timestamp string
+            timestamp = now.strftime("%d-%m-%Y %H:%M:%S")
+            textstr = (
+                f"Generated at\n" 
+                f"TSSFL Technology Stack\n"
+                f"www.tssfl.com\n"
+                f"on {timestamp}"
+            )
+            #Add Most Recent Transaction Date
+            plt.gcf().text(0.685, 0.35, textstr, fontsize=14, color='green')
+            plt.gcf().text(0.685, 0.30, f"Transaction Date: {most_recent_date.strftime('%d-%m-%Y')}", fontsize=14, color='blue')  #Adjust position as needed
+
             plt.xlabel("Amount")
             plt.ylabel("Description")
             plt.show()

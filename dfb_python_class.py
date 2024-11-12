@@ -775,7 +775,7 @@ class FinancialReport:
             )
             #Add Most Recent Transaction Date
             plt.gcf().text(0.685, 0.35, textstr, fontsize=14, color='green')
-            plt.gcf().text(0.685, 0.30, f"Transaction Date: {most_recent_date.strftime('%d-%m-%Y')}", fontsize=14, color='blue')  #Adjust position as needed
+            plt.gcf().text(0.685, 0.30, f"Transaction Date:\n{most_recent_date.strftime('%d-%m-%Y')}", fontsize=14, color='blue') #Adjust position as needed
 
             plt.xlabel("Amount")
             plt.ylabel("Description")

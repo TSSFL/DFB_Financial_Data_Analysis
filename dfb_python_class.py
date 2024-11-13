@@ -120,7 +120,7 @@ class FinancialReport:
             return ""
         
     def generate_html_table(self, df, output_file):
-        df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Computed at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%Y-%m-%d %H:%M:%S')} Estern AFrica Time")], df.columns])
+        df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Computed at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
 
         #df.columns = pd.MultiIndex.from_product([[textstr], df.columns])
         df_html = build_table(df, 'green_light', font_size='medium', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='black', even_bg_color='gray')
@@ -193,23 +193,11 @@ class FinancialReport:
          if self.df is None:
             print("DataFrame is not available. Please call process_data() first.")
             return
-         #Handle empty strings
-         #Identify numerical columns (exclude columns containing specific keywords)
-         exclude_keywords = ["Timestamp", "Submitter", "Transaction", "Details", "INCIDENTS"]
-         numerical_cols = [col for col in self.df.columns 
-                  if not any(keyword in col for keyword in exclude_keywords)]
 
-         #Convert numerical columns to numeric type, handling errors
-         for col in numerical_cols:
-             try:
-                 #Attempt direct conversion to numeric
-                 self.df[col] = pd.to_numeric(self.df[col], errors='coerce').fillna(0).astype(float)  #or float if needed
-
-             except (TypeError, ValueError): #More robust handling if necessary (for mixed data types within a column)
-                 self.df[col] = self.df[col].apply(lambda col: col.apply(lambda x: float(pd.to_numeric(x, errors='coerce')) if pd.notnull(x) else 0.0))
-                 self.df[col] = self.df[col].fillna(0).astype(float) #fillna(0) before astype(float) or it will raise an error.
-
-         
+         #Convert to string types, handling 0, 0.0, and NaN
+         for col in self.df.columns:
+             if any(keyword in col for keyword in ["Details", "INCIDENTS"]):
+                 self.df[col] = self.df[col].astype(str).replace(r'^(0\.0|0|nan)$', '', regex=True)
          #Convert 'Date of Transaction' column to datetime
          self.df['Date of Transaction'] = pd.to_datetime(self.df['Date of Transaction'], format='%m/%d/%Y')
          self.df['Grouped Date'] = self.df['Date of Transaction'].dt.date
@@ -337,10 +325,10 @@ class FinancialReport:
          else:
              print("TOTAL SUPERAGENT BANK FLOAT: No Matching columns")
 
-         #NORMAL MOBILE COMMISSION TOTAL
-         mobile_comm_cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", "AGENCY"])]
+         #NORMAL MOBILE COMMISSION TOTAL - includes MOBILE BUNDLES COMM and SHARES
+         mobile_comm_cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", "AGENCY", "Details"])]
          if mobile_comm_cols:
-             self.df['TOTAL NORMAL MOBILE COMMISSION'] = self.df[mobile_comm_cols].sum(axis=1)
+             self.df['TOTAL NORMAL MOBILE COMMISSION'] = self.df[mobile_comm_cols].sum(numeric_only=True, axis=1)
          else:
              print("TOTAL NORMAL MOBILE COMMISSION: No Matching columns")
  
@@ -380,9 +368,9 @@ class FinancialReport:
              print("TOTAL SUPERAGENT BANK COMMISSION: No matching columns") 
     
          #TOTAL MOBILE COMMISSION
-         cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "TOTAL", "SELCOM", "AGENCY"])]
+         cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "TOTAL", "SELCOM", "AGENCY", "Details"])]
          if cols: 
-             self.df['TOTAL MOBILE COMMISSION'] = self.df[cols].sum(axis=1)
+             self.df['TOTAL MOBILE COMMISSION'] = self.df[cols].sum(numeric_only=True, axis=1)
          else: 
              print("TOTAL MOBILE COMMISSION: No Matching columns")
     
@@ -449,6 +437,10 @@ class FinancialReport:
          #Move and rearrange columns
          cols_to_left = ['Timestamp', 'Name of Submitter']
          cols_to_right = ['CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS', 'Date of Transaction']
+         
+         #Check if 'MOBILE BUNDLES and SHARES Details' exists and add it to the beginning of cols_to_right
+         if 'MOBILE BUNDLES and SHARES Details' in self.df.columns:
+             cols_to_right.insert(0, 'MOBILE BUNDLES and SHARES Details')
          other_cols = [col for col in self.df.columns if col not in cols_to_left + cols_to_right]
 
          self.df = self.df[cols_to_left + other_cols + cols_to_right]
@@ -603,9 +595,6 @@ class FinancialReport:
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%m/%d/%Y')
         most_recent_date = df['Date of Transaction'].max()
         df = self.date_time(df)
-        
-        #Extract the most recent date
-        print("Recent Date:", most_recent_date)
         
         date = date
         #df = df.tail(1) if date is None else df[df['Date of Transaction'] == date].sample(n=1)

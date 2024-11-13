@@ -49,7 +49,8 @@ class FinancialReport:
         "🌟 Welcome to TSSFL Technology Stack! 🚀\n"
         "Embark on a journey of financial insights as we\n" 
         "process your data with precision and elegance.\n"
-        "Please hold on while we craft your comprehensive report! 📊✨")
+        "Please hold on while we craft your comprehensive report! 📊✨\n"
+        "")
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
         #Define the scope
         scope = ['https://www.googleapis.com/auth/spreadsheets'] 
@@ -98,7 +99,11 @@ class FinancialReport:
         df.index = df.index + 1       #Add 1 to the reset index
         
         #Sum columns
-        df.loc["COLUMN TOTALS"] = df[[col for col in df.columns if any(kw in col for kw in ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW']) and not any(kw in col for kw in ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp'])]].sum(numeric_only=True, axis=0)
+        keywords = ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS']
+        exclusions = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
+        pattern = f"^.*(?:{'|'.join(keywords)}).*$(?!.*(?:{'|'.join(exclusions)})).*$"  #Advanced regex
+        df.loc["COLUMN TOTALS"] = df.filter(regex=pattern).sum(numeric_only=True, axis=0)
+        
         #Column averages
         df.loc["COLUMN AVERAGES"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0).round(2)
         #Column maximums
@@ -418,7 +423,7 @@ class FinancialReport:
          
          self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
-         #Expected Operating Capital
+         #Excess/Loss
          self.df.insert(self.df.columns.get_loc('EXPECTED OPERATING CAPITAL') + 1, 'EXCESS/LOSS', self.df['ACTUAL OPERATING CAPITAL'] - self.df['EXPECTED OPERATING CAPITAL'])
 
          #Excess
@@ -526,16 +531,9 @@ class FinancialReport:
         df = df.loc[mask]
         df = df[['DAY NAME'] + [col for col in df.columns if col != 'DAY NAME']]
         
-        #df = self.calculations(df)
-        #Sum columns
-        df.loc["COLUMN TOTALS"] = df[[col for col in df.columns if any(kw in col for kw in ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW']) and not any(kw in col for kw in ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp'])]].sum(numeric_only=True, axis=0)
-        #Column averages
-        df.loc["COLUMN AVERAGES"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0).round(2)
-        #Column maximums
-        df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
-        #Column minimums
-        df.loc["COLUMN MINIMUMS"] = df.iloc[:-3].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
-         
+        #Compute sums, averages, maxs and mins
+        df = self.calculations(df)
+    
         df = df.map(self.format_data)
         df = self.date_time(df)
         #Report
@@ -567,16 +565,9 @@ class FinancialReport:
         df = df.loc[weekday_mask]
         df = df[['DAY NAME'] + [col for col in df.columns if col != 'DAY NAME']]
         
-        #df = self.calculations(df) - right shift by +1
-        #Sum columns
-        df.loc["COLUMN TOTALS"] = df[[col for col in df.columns if any(kw in col for kw in ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW']) and not any(kw in col for kw in ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp'])]].sum(numeric_only=True, axis=0)
-        #Column averages
-        df.loc["COLUMN AVERAGES"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0).round(2)
-        #Column maximums
-        df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
-        #Column minimums
-        df.loc["COLUMN MINIMUMS"] = df.iloc[:-3].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
-         
+        #Compute sums, averages, maxs and mins
+        df = self.calculations(df)  #Right shift by +1
+
         df = df.map(self.format_data)
         df = self.date_time(df)
         
@@ -635,11 +626,11 @@ class FinancialReport:
         
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
-        plt.rc('axes', titlesize=18)     # fontsize of the axes title
-        plt.rc('axes', labelsize=14)    # fontsize of the x and y labels
-        plt.rc('xtick', labelsize=13)    # fontsize of the tick labels
-        plt.rc('ytick', labelsize=13)    # fontsize of the tick labels
-        plt.rc('legend', fontsize=13)    # legend fontsize
+        plt.rc('axes', titlesize=18)     #fontsize of the axes title
+        plt.rc('axes', labelsize=14)    #fontsize of the x and y labels
+        plt.rc('xtick', labelsize=13)    #fontsize of the tick labels
+        plt.rc('ytick', labelsize=13)    #fontsize of the tick labels
+        plt.rc('legend', fontsize=13)    #legend fontsize
         plt.rc('font', size=13)
  
         colors1 = sns.color_palette('pastel')
@@ -664,7 +655,7 @@ class FinancialReport:
                 print("i & v:", i,v)
             #plt.subplots_adjust(right=0.3)    
             #plt.text(0.02, 0.5, textstr, fontsize=14, transform=plt.gcf().transFigure)
-            plt.gcf().text(0.7, 0.3, textstr, fontsize=14, color='green') # (0,0) is bottom left, (1,1) is top right
+            plt.gcf().text(0.7, 0.3, textstr, fontsize=14, color='green') #(0,0) is bottom left, (1,1) is top right
             plt.xlabel("Amount")
             plt.ylabel("Description")
             plt.show()

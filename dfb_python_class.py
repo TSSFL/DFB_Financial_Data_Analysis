@@ -98,6 +98,21 @@ class FinancialReport:
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
         
+        #Replace 0, '', nan with float 0.00
+        keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
+        keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
+        #Select relevant columns
+        relevant_cols = [col for col in df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
+        for col in relevant_cols:
+            try:
+                #Attempt direct conversion to numeric, coercing errors to NaN
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+            except TypeError:  # Handle cases where pd.to_numeric might fail
+                print(f"Column '{col}' could not be converted directly. Attempting string cleaning.")
+                #Add more sophisticated string cleaning below if needed
+            #Replace NaNs, 0, and empty strings with 0.0
+            df[col] = df[col].fillna(0.0).replace('', 0.0)
+            
         #Sum columns
         keywords = ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS']
         exclusions = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
@@ -198,12 +213,6 @@ class FinancialReport:
          if self.df is None:
             print("DataFrame is not available. Please call process_data() first.")
             return
-            
-         keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
-         keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
-        
-         #Replace 0, '', nan with float 0.00
-         self.df.loc[:, [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]] = self.df.loc[:, [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]].replace([np.nan, 0, ''], 0.00)
 
          #Convert to string types, handling 0, 0.0, and NaN
          for col in self.df.columns:
@@ -632,11 +641,11 @@ class FinancialReport:
         
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
-        plt.rc('axes', titlesize=18)     #fontsize of the axes title
-        plt.rc('axes', labelsize=14)    #fontsize of the x and y labels
-        plt.rc('xtick', labelsize=13)    #fontsize of the tick labels
-        plt.rc('ytick', labelsize=13)    #fontsize of the tick labels
-        plt.rc('legend', fontsize=13)    #legend fontsize
+        plt.rc('axes', titlesize=18)     #Fontsize of the axes title
+        plt.rc('axes', labelsize=14)    #Fontsize of the x and y labels
+        plt.rc('xtick', labelsize=13)    #Fontsize of the tick labels
+        plt.rc('ytick', labelsize=13)    #Fontsize of the tick labels
+        plt.rc('legend', fontsize=13)    #Legend fontsize
         plt.rc('font', size=13)
  
         colors1 = sns.color_palette('pastel')

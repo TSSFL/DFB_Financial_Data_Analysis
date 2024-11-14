@@ -198,6 +198,12 @@ class FinancialReport:
          if self.df is None:
             print("DataFrame is not available. Please call process_data() first.")
             return
+            
+         keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
+         keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
+        
+         #Replace 0, '', nan with float 0.00
+         self.df.loc[:, [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]] = self.df.loc[:, [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]].replace([np.nan, 0, ''], 0.00)
 
          #Convert to string types, handling 0, 0.0, and NaN
          for col in self.df.columns:

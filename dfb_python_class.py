@@ -145,7 +145,7 @@ class FinancialReport:
         style = """
         <style scoped>
         .dataframe-div {
-        max-height: 640px;
+        max-height: 1240px;
         overflow: auto;
         position: relative;
         }
@@ -278,7 +278,7 @@ class FinancialReport:
                  self.df.insert(self.df.columns.get_loc(group[-1]) + 1, total_col_name, self.df[list(group)].sum(axis=1))
           
          #Replace 0, '', nan with float 0.00
-         keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
+         keywords_include = ['BANK', 'COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
          keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
          #Select relevant columns
          relevant_cols = [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
@@ -746,7 +746,7 @@ class FinancialReport:
             #Full report
             #Plot 1
             df_sorted = df.sort_values('Amount',ascending=True)
-            plt.figure(figsize=(12,20), tight_layout=True)
+            plt.figure(figsize=(12,25), tight_layout=True)
             sns.barplot(x=df_sorted['Amount'],y=df_sorted['Description'],data=df_sorted, color="deepskyblue")
             plt.xticks(rotation=90)
             plt.title("Amounts in TZS")
@@ -792,4 +792,3 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
-

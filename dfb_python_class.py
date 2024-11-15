@@ -119,12 +119,10 @@ class FinancialReport:
         pattern = f"^.*(?:{'|'.join(keywords)}).*$(?!.*(?:{'|'.join(exclusions)})).*$"  #Advanced regex
         df.loc["COLUMN TOTALS"] = df.filter(regex=pattern).sum(numeric_only=True, axis=0)
         
-        #Column averages
-        df.loc["COLUMN AVERAGES"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0).round(2)
         #Column maximums
-        df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
+        df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
         #Column minimums
-        df.loc["COLUMN MINIMUMS"] = df.iloc[:-3].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
+        df.loc["COLUMN MINIMUMS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
         return df
         
     def format_data(self, x):
@@ -232,7 +230,7 @@ class FinancialReport:
          self.df.columns = self.df.columns.str.strip().str.replace(r'\s+', ' ', regex=True)
 
          #Base keywords
-         base_key = ['AIRTEL MONEY ', 'AIRTEL LIPA ', 'VODA LIPA ', 'TIGO PESA ', 'M PESA ', 'HALO PESA ', 'AZAM PESA ', 'CRDB BANK ', 'NMB BANK ', 'NBC BANK ', 'EQUITY BANK ', 'SELCOM ']
+         base_key = ['AIRTEL MONEY ', 'AIRTEL LIPA ', 'VODA LIPA ', 'TIGO PESA ', 'M PESA ', 'HALO PESA ', 'AZAM PESA ', 'CRDB BANK ', 'NMB BANK ', 'NBC BANK ', 'EQUITY BANK ', 'SELCOM ', 'AZANIA BANK ']
  
          #Initialize the grouped column list
          grouped_column_list = []
@@ -274,10 +272,26 @@ class FinancialReport:
                  #Or use one liner instead of the two above:
                  #base_name = re.sub(r'\s*(?:\d+\s*)+', ' ', group[0]).strip()
                  total_col_name = f"{base_name} TOTAL"
- 
+                 #Ensure all columns in the group are numeric
+                 self.df[list(group)] = self.df[list(group)].apply(pd.to_numeric, errors='coerce')
                  #Calculate sum and insert new column
                  self.df.insert(self.df.columns.get_loc(group[-1]) + 1, total_col_name, self.df[list(group)].sum(axis=1))
-                 
+          
+         #Replace 0, '', nan with float 0.00
+         keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
+         keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
+         #Select relevant columns
+         relevant_cols = [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
+         for col in relevant_cols:
+             try:
+                 #Attempt direct conversion to numeric, coercing errors to NaN
+                 self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+             except TypeError:  # Handle cases where pd.to_numeric might fail
+                 print(f"Column '{col}' could not be converted directly. Attempting string cleaning.")
+                 #Add more sophisticated string cleaning below if needed
+             #Replace NaNs, 0, and empty strings with 0.0
+             self.df[col] = self.df[col].fillna(0.0).replace('', 0.0) 
+             
          #NORMAL MOBILE FLOAT TOTAL
          #Keywords to exclude
          exclude_keywords = ["BANK", "COMM", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", 
@@ -747,7 +761,7 @@ class FinancialReport:
             
         elif report_type == 'descend': #Plot 2
             df_sorted = df.sort_values('Amount',ascending=False)
-            plt.figure(figsize=(12,20), tight_layout=True)
+            plt.figure(figsize=(10,25), tight_layout=True)
             sns.barplot(x=df_sorted['Amount'],y=df_sorted['Description'],data=df_sorted, color="deepskyblue")
             plt.xticks(rotation=90)
             plt.title("Amounts in TZS")
@@ -778,3 +792,4 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
+

@@ -119,10 +119,53 @@ class FinancialReport:
         pattern = f"^.*(?:{'|'.join(keywords)}).*$(?!.*(?:{'|'.join(exclusions)})).*$"  #Advanced regex
         df.loc["COLUMN TOTALS"] = df.filter(regex=pattern).sum(numeric_only=True, axis=0)
         
+        def calculate_averages(df):
+            """Calculates averages of specific columns in a Pandas DataFrame, excluding the last row.
+            Args:
+                df: The Pandas DataFrame.
+            Returns:
+                A Pandas Series containing the calculated averages, or None if no matching columns are found.
+            """
+            keywords = []  # If you have any keywords to INCLUDE, put them here
+            exclusions = ["DETAILS", "INCIDENTS", "TRANSACTION", "SUBMITTER", "TIMESTAMP", "DAY NAME"]
+
+            #Exclude the last row from calculations
+            df_calc = df.iloc[:-1, :]
+            #Filter columns based on keywords and exclude keywords
+            filtered_columns = []
+            for col in df_calc.columns:
+                if (not keywords or any(keyword in col.upper() for keyword in keywords)) and not any(exclude_keyword in col.upper() for exclude_keyword in exclusions):  # Case-insensitive matching
+                    filtered_columns.append(col)
+
+            if not filtered_columns:
+                return None  #No matching columns found
+
+            averages = {}
+            for col in filtered_columns:
+                if 'COMM' in col.upper() or 'COMMISSION' in col.upper():  # Special handling for COMM/COMMISSION
+                    values = df_calc[col][df_calc[col] > 0]  # Consider only values > 0
+                    if not values.empty:  # Check if there are any values > 0
+                        averages[col] = values.mean()
+                else:
+                    #Handle potential non-numeric values gracefully, skipping them in the average
+                    numeric_values = pd.to_numeric(df_calc[col], errors='coerce')
+                    if not numeric_values.isnull().all(): # Check if all values are NaN after conversion.
+                        averages[col] = numeric_values.mean()
+
+            return pd.Series(averages, name="AVERAGE FLOAT")
+
+        #Example Usage (assuming you have a DataFrame 'df'):
+
+        #Apply the function and add the results as a new row
+        result_series = calculate_averages(df)
+
+        if result_series is not None:
+            df.loc["AVERAGE FLOAT"] = result_series
+        #df.loc["AVERAGE FLOAT"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0)
         #Column maximums
-        df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
+        df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
         #Column minimums
-        df.loc["COLUMN MINIMUMS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
+        df.loc["COLUMN MINIMUMS"] = df.iloc[:-3].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
         return df
         
     def format_data(self, x):
@@ -141,7 +184,7 @@ class FinancialReport:
         df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Computed at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
 
         #df.columns = pd.MultiIndex.from_product([[textstr], df.columns])
-        df_html = build_table(df, 'green_light', font_size='medium', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='black', even_bg_color='gray')
+        df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue', even_bg_color='#c3d9ff')
         style = """
         <style scoped>
         .dataframe-div {
@@ -196,7 +239,9 @@ class FinancialReport:
     def summary_df(self, df):
         #Remove columns that starts with TOTAL and those contained the keywords shown
         summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('Submitter|COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|Details|INCIDENTS', case=False)]
-        
+        cols = summary_df.columns.drop(['Timestamp', 'Date of Transaction'])
+        sorted_cols = sorted(cols)
+        summary_df = summary_df[['Timestamp'] + sorted_cols + ['Date of Transaction']]
         return summary_df
         
     def _full_report(self, report_type = "default_report_type"):
@@ -230,7 +275,7 @@ class FinancialReport:
          self.df.columns = self.df.columns.str.strip().str.replace(r'\s+', ' ', regex=True)
 
          #Base keywords
-         base_key = ['AIRTEL MONEY ', 'AIRTEL LIPA ', 'VODA LIPA ', 'TIGO PESA ', 'M PESA ', 'HALO PESA ', 'AZAM PESA ', 'CRDB BANK ', 'NMB BANK ', 'NBC BANK ', 'EQUITY BANK ', 'SELCOM ', 'AZANIA BANK ']
+         base_key = ['AIRTEL MONEY ', 'AIRTEL LIPA ', 'VODA LIPA ', 'TIGO-PESA ', 'M-PESA ', 'HALO-PESA ', 'AZAM PESA ', 'CRDB BANK ', 'NMB BANK ', 'NBC BANK ', 'EQUITY BANK ', 'SELCOM ', 'AZANIA BANK ']
  
          #Initialize the grouped column list
          grouped_column_list = []
@@ -647,7 +692,7 @@ class FinancialReport:
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
         
-        table = build_table(df, 'green_light', font_size='medium', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='black',   even_bg_color='gray')
+        table = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
         
         with open("Compact_Report.html","w+") as file:
             file.write(table)

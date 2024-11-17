@@ -654,6 +654,36 @@ class FinancialReport:
 
         self.generate_html_table(df, output_file)
     
+    
+    def date_range_report(self, start_date, end_date, report_type):
+        df = self.df.copy()
+        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
+        
+        #Convert start_date and end_date strings to datetime objects
+        start_date = pd.to_datetime(start_date, format='%d/%m/%Y')
+        end_date = pd.to_datetime(end_date, format='%d/%m/%Y')
+
+        #Filter rows based on the date range
+        df = df[(df['Date of Transaction'] >= start_date) & (df['Date of Transaction'] <= end_date)]
+
+        #If the dataframe is empty after filtering, return early
+        if df.empty:
+            print("No data found for the specified date range.")
+            return
+
+        df = self.calculations(df)
+        df = df.map(self.format_data)  #Assuming format_data works element-wise or with .apply()
+        df = self.date_time(df)
+
+        #Reports
+        if report_type == 'brief':
+            df = self.subset_df(df)
+            output_file = f'Brief_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html' #Dynamic file name
+        else:
+            output_file = f'Full_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html'  #Dynamic file name
+
+        self.generate_html_table(df, output_file)
+
     def graphs(self, date, report_type):
         #top_ten, lower_ten, full
         df = self.df
@@ -837,3 +867,4 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
+

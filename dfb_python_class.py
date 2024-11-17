@@ -88,7 +88,7 @@ class FinancialReport:
         return self.df
         
     def date_time(self, df):
-        df['Timestamp'] = pd.to_datetime(df['Timestamp']).dt.strftime('%d/%m/%Y %H:%M:%S')
+        df['Timestamp'] = pd.to_datetime(df['Timestamp']).dt.strftime('%m/%d/%Y %H:%M:%S')
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction']).dt.strftime('%d/%m/%Y')
         
         return df
@@ -687,7 +687,7 @@ class FinancialReport:
     def graphs(self, date, report_type):
         #top_ten, lower_ten, full
         df = self.df
-        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%m/%d/%Y')
+        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
         most_recent_date = df['Date of Transaction'].max()
         df = self.date_time(df)
         
@@ -867,4 +867,3 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
-

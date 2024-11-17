@@ -686,12 +686,12 @@ class FinancialReport:
         #Reset the index and name the index column
         df.reset_index(inplace=True)
         df.rename(columns={'index': 'Description'}, inplace=True)
-        
+        #keep rows where the 'Amount' column is neither zero, NaN, nor a string
         df = df[~((df['Amount'] == 0) | (df['Amount'].isna()) | (df['Amount'].apply(lambda x: isinstance(x, str))))]
             
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
-        
+        df = df.map(self.format_data)
         table = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
         
         with open("Compact_Report.html","w+") as file:

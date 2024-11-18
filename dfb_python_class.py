@@ -721,12 +721,6 @@ class FinancialReport:
             
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
-        df = df.map(self.format_data)
-        table = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
-        
-        with open("Compact_Report.html","w+") as file:
-            file.write(table)
-        #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
         
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
@@ -866,4 +860,9 @@ class FinancialReport:
             plt.show()
             plt.close()
         else:
-            pass #Do nothing
+            df = df.map(self.format_data)
+            table = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
+        
+            with open("Compact_Report.html","w+") as file:
+                file.write(table)
+            #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])

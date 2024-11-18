@@ -99,7 +99,7 @@ class FinancialReport:
         df.index = df.index + 1       #Add 1 to the reset index
         
         #Replace 0, '', nan with float 0.00
-        keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
+        keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS', 'CREDIT', 'DEBIT']
         keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
         #Select relevant columns
         relevant_cols = [col for col in df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
@@ -114,7 +114,7 @@ class FinancialReport:
             df[col] = df[col].fillna(0.0).replace('', 0.0)
             
         #Sum columns
-        keywords = ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS']
+        keywords = ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'CREDIT', 'DEBIT']
         exclusions = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
         pattern = f"^.*(?:{'|'.join(keywords)}).*$(?!.*(?:{'|'.join(exclusions)})).*$"  #Advanced regex
         df.loc["COLUMN TOTALS"] = df.filter(regex=pattern).sum(numeric_only=True, axis=0)
@@ -142,7 +142,7 @@ class FinancialReport:
 
             averages = {}
             for col in filtered_columns:
-                if 'COMM' in col.upper() or 'COMMISSION' in col.upper():  # Special handling for COMM/COMMISSION
+                if 'COMM' in col.upper() or 'COMMISSION' in col.upper() or 'CREDIT' in col.upper() or 'DEBIT' in col.upper(): #Special handling for COMM/COMMISSION, CREDIT, DEBIT
                     values = df_calc[col][df_calc[col] > 0]  # Consider only values > 0
                     if not values.empty:  # Check if there are any values > 0
                         averages[col] = values.mean()
@@ -152,7 +152,7 @@ class FinancialReport:
                     if not numeric_values.isnull().all(): # Check if all values are NaN after conversion.
                         averages[col] = numeric_values.mean()
 
-            return pd.Series(averages, name="AVERAGE FLOAT")
+            return pd.Series(averages, name="AVERAGE AMOUNT")
 
         #Example Usage (assuming you have a DataFrame 'df'):
 
@@ -160,8 +160,8 @@ class FinancialReport:
         result_series = calculate_averages(df)
 
         if result_series is not None:
-            df.loc["AVERAGE FLOAT"] = result_series
-        #df.loc["AVERAGE FLOAT"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0)
+            df.loc["AVERAGE AMOUNT"] = result_series
+        #df.loc["AVERAGE AMOUNT"] = df.iloc[:-1].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").mean(numeric_only=True, axis=0)
         #Column maximums
         df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
         #Column minimums
@@ -238,7 +238,7 @@ class FinancialReport:
     #Subset a df for Float Summary
     def summary_df(self, df):
         #Remove columns that starts with TOTAL and those contained the keywords shown
-        summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('Submitter|COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|Details|INCIDENTS', case=False)]
+        summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('Submitter|COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|CREDIT|DEBIT|Details|INCIDENTS', case=False)]
         cols = summary_df.columns.drop(['Timestamp', 'Date of Transaction'])
         sorted_cols = sorted(cols)
         summary_df = summary_df[['Timestamp'] + sorted_cols + ['Date of Transaction']]
@@ -323,7 +323,7 @@ class FinancialReport:
                  self.df.insert(self.df.columns.get_loc(group[-1]) + 1, total_col_name, self.df[list(group)].sum(axis=1))
           
          #Replace 0, '', nan with float 0.00
-         keywords_include = ['BANK', 'COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS']
+         keywords_include = ['BANK', 'COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS', 'CREDIT', 'DEBIT']
          keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
          #Select relevant columns
          relevant_cols = [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
@@ -340,7 +340,7 @@ class FinancialReport:
          #NORMAL MOBILE FLOAT TOTAL
          #Keywords to exclude
          exclude_keywords = ["BANK", "COMM", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", 
-                    "AGENCY", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction"]
+                    "AGENCY", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction", 'CREDIT', 'DEBIT']
                     
          #Columns to sum for "NORMAL MOBILE FLOAT TOTAL"
          normal_mobile_columns = [col for col in self.df.columns if not any(keyword in col for keyword in exclude_keywords)]  
@@ -469,7 +469,7 @@ class FinancialReport:
     
          #TOTAL MOBILE FLOAT
          cols = [col for col in self.df.columns if not any(kw in col for kw in ["BANK", "TOTAL", "COMM", "SELCOM", "AGENCY", 
-                                                                  "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction"])]
+                                                                  "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction", 'CREDIT', 'DEBIT'])]
          if cols:
              self.df['TOTAL MOBILE FLOAT'] = self.df[cols].sum(axis=1)
          else:
@@ -483,7 +483,7 @@ class FinancialReport:
              print("TOTAL BANK FLOAT: No Matching columns")
     
          #TOTAL FLOAT
-         cols = [col for col in self.df.columns if not any(keyword in col for keyword in ["COMM", "TOTAL", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction"])]
+         cols = [col for col in self.df.columns if not any(keyword in col for keyword in ["COMM", "TOTAL", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction", 'CREDIT', 'DEBIT'])]
          if cols: 
              self.df['TOTAL FLOAT'] = self.df[cols].sum(axis=1)
          else: 
@@ -493,7 +493,7 @@ class FinancialReport:
          self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
 
          #Compute loss/excess
-         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
+         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'CREDIT']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'DEBIT']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
          
          self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
@@ -509,13 +509,13 @@ class FinancialReport:
          self.df.insert(self.df.columns.get_loc('EXCESS/LOSS') + 2, 'EXCESS/LOSS', self.df.pop('EXCESS/LOSS'))
 
          #Total cash inflow
-         self.df.insert(self.df.columns.get_loc('TOTAL FLOAT') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'EXCESS']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL FLOAT') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'EXCESS', 'CREDIT']].sum(numeric_only=True, axis=1))
          #Total cash outflow
-         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES', 'DEBIT']].sum(numeric_only=True, axis=1))
          
          #Move and rearrange columns
          cols_to_left = ['Timestamp', 'Name of Submitter']
-         cols_to_right = ['CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS', 'Date of Transaction']
+         cols_to_right = ['CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'CREDIT Details', 'DEBIT Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS', 'Date of Transaction']
          
          #Check if 'MOBILE BUNDLES and SHARES Details' exists and add it to the beginning of cols_to_right
          if 'MOBILE BUNDLES and SHARES Details' in self.df.columns:
@@ -866,3 +866,4 @@ class FinancialReport:
             with open("Compact_Report.html","w+") as file:
                 file.write(table)
             #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
+

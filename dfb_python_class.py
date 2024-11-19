@@ -181,10 +181,10 @@ class FinancialReport:
             return ""
         
     def generate_html_table(self, df, output_file):
-        df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Computed at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
+        df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Generated at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
 
-        #df.columns = pd.MultiIndex.from_product([[textstr], df.columns])
-        df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue', even_bg_color='#c3d9ff')
+        df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True,
+        even_color='darkblue', even_bg_color='#c3d9ff')
         style = """
         <style scoped>
         .dataframe-div {
@@ -199,11 +199,12 @@ class FinancialReport:
         top: 0;
         background: green;
         color: darkblue;
+        z-index: 2; /* Ensure it's above tbody */
         }
     
         .dataframe thead th:first-child {
         left: 0;
-        z-index: 1;
+        z-index: 3; /* Ensure it's above other headers - z-index: 1; */
         }
     
         .dataframe tbody tr th:only-of-type {
@@ -217,7 +218,28 @@ class FinancialReport:
         background: blue;
         color: green;
         vertical-align: top;
+        z-index: 1; /* Ensure it sits below thead */
         }
+/* Recently added */       
+.table-outer {
+ overflow-x: auto;
+ height: calc(100vh - 100px); /* full height minus header and footer */
+}
+
+header {
+  height: 60px;
+}
+
+footer {
+  height: 40px;
+}
+
+/* Optional: Add responsiveness */
+@media (max-width: 600px) {
+    .dataframe {
+        font-size: 12px; /* Adjust font size for small screens */
+    }
+}
         </style>
         """
         df_html = style + '<div class="dataframe-div">' + df_html + "\n</div>"
@@ -690,27 +712,28 @@ class FinancialReport:
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
         most_recent_date = df['Date of Transaction'].max()
         df = self.date_time(df)
-        
         date = date
-        #df = df.tail(1) if date is None else df[df['Date of Transaction'] == date].sample(n=1)
         duplicate_count = 0
         if date is None:
-            df_selected = df.tail(1)
+            #df_selected = df.tail(1)
+            df_selected = df[df['Date of Transaction'] == most_recent_date].copy()  #Use most recent date if none provided
         else:
             filtered_df = df[df['Date of Transaction'] == date]
             if filtered_df.empty:
-                #Handle the case where there are no transactions on the specified date.
-                #For example, you might set df_selected to an empty DataFrame or raise an exception.
-                df_selected = pd.DataFrame()  # Or raise an appropriate exception
-                print(f"No transactions found for date: {date}")
+                #Handle the case where there are no transactions on the specified date
+                print(f"No transactions found for date: {date}") #Print only the date part
+                return  #Exit the function early
             else:
                 duplicate_count = filtered_df.duplicated(subset='Date of Transaction').sum()
                 df_selected = filtered_df.sample(n=1)
 
         print("Number of duplicate rows found:", duplicate_count)
-        
+       
         #Filter or subset the df to exclude columns names with the given keywords
         df_selected = df_selected[[col for col in df_selected.columns if not any(keyword in col for keyword in ["Timestamp", "Submitter", "Transaction", "Details", "INCIDENTS"])]]
+        if df_selected.empty:
+            print("No valid data to display.")
+            return  #Exit the function early if no valid data
         df = df_selected.T
         df.columns = ['Amount']
         #Reset the index and name the index column
@@ -721,6 +744,16 @@ class FinancialReport:
             
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
+        
+        df1 = df #Redefine df for tabular formatted data
+        df1 = df1.map(self.format_data)
+        df1.columns = pd.MultiIndex.from_product([[(f"Transaction Date: {date}; Generated on: {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')}")], df1.columns])
+        table = build_table(df1, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
+    
+        
+        with open("Compact_Report.html","w+") as file:
+            file.write(table)
+        #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
         
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
@@ -860,10 +893,5 @@ class FinancialReport:
             plt.show()
             plt.close()
         else:
-            df = df.map(self.format_data)
-            table = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
-        
-            with open("Compact_Report.html","w+") as file:
-                file.write(table)
-            #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
+            pass #Do nothing
 

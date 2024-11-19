@@ -204,7 +204,7 @@ class FinancialReport:
     
         .dataframe thead th:first-child {
         left: 0;
-        z-index: 3; /* Ensure it's above other headers - z-index: 1; */
+        z-index: 1.5; /* Ensure it's above other headers - z-index: 1; */
         }
     
         .dataframe tbody tr th:only-of-type {
@@ -237,7 +237,7 @@ footer {
 /* Optional: Add responsiveness */
 @media (max-width: 600px) {
     .dataframe {
-        font-size: 12px; /* Adjust font size for small screens */
+        font-size: 16px; /* Adjust font size for small screens */
     }
 }
         </style>

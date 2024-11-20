@@ -199,12 +199,12 @@ class FinancialReport:
         top: 0;
         background: green;
         color: darkblue;
-        z-index: 2; /* Ensure it's above tbody */
+        z-index: 1.5; /* Ensure it's above tbody */
         }
     
         .dataframe thead th:first-child {
         left: 0;
-        z-index: 1.5; /* Ensure it's above other headers - z-index: 1; */
+        z-index: 1; /* Ensure it's above other headers - z-index: 1; */
         }
     
         .dataframe tbody tr th:only-of-type {
@@ -220,26 +220,26 @@ class FinancialReport:
         vertical-align: top;
         z-index: 1; /* Ensure it sits below thead */
         }
-/* Recently added */       
-.table-outer {
- overflow-x: auto;
- height: calc(100vh - 100px); /* full height minus header and footer */
-}
+        /* Recently added */       
+        .table-outer {
+        overflow-x: auto;
+        height: calc(100vh - 100px); /* full height minus header and footer */
+        }
 
-header {
-  height: 60px;
-}
+        header {
+        height: 60px;
+        }
 
-footer {
-  height: 40px;
-}
+        footer {
+        height: 60px;
+        }
 
-/* Optional: Add responsiveness */
-@media (max-width: 600px) {
-    .dataframe {
+        /* Optional: Add responsiveness */
+        @media (max-width: 600px) {
+        .dataframe {
         font-size: 16px; /* Adjust font size for small screens */
-    }
-}
+        }
+        }
         </style>
         """
         df_html = style + '<div class="dataframe-div">' + df_html + "\n</div>"
@@ -515,7 +515,7 @@ footer {
          self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
 
          #Compute loss/excess
-         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'CREDIT']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'DEBIT']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
+         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'DEBIT']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
          
          self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
@@ -531,9 +531,9 @@ footer {
          self.df.insert(self.df.columns.get_loc('EXCESS/LOSS') + 2, 'EXCESS/LOSS', self.df.pop('EXCESS/LOSS'))
 
          #Total cash inflow
-         self.df.insert(self.df.columns.get_loc('TOTAL FLOAT') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'EXCESS', 'CREDIT']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL FLOAT') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'EXCESS', 'DEBIT']].sum(numeric_only=True, axis=1))
          #Total cash outflow
-         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES', 'DEBIT']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES', 'CREDIT']].sum(numeric_only=True, axis=1))
          
          #Move and rearrange columns
          cols_to_left = ['Timestamp', 'Name of Submitter']
@@ -710,12 +710,15 @@ footer {
         #top_ten, lower_ten, full
         df = self.df
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
-        most_recent_date = df['Date of Transaction'].max()
+        print("Dates:", df['Date of Transaction'])
+        most_recent_date = df['Date of Transaction'].max().strftime('%d/%m/%Y')
         df = self.date_time(df)
         date = date
+        print("Dates:", date)
+
         duplicate_count = 0
         if date is None:
-            #df_selected = df.tail(1)
+            date = most_recent_date
             df_selected = df[df['Date of Transaction'] == most_recent_date].copy()  #Use most recent date if none provided
         else:
             filtered_df = df[df['Date of Transaction'] == date]
@@ -735,7 +738,8 @@ footer {
             print("No valid data to display.")
             return  #Exit the function early if no valid data
         df = df_selected.T
-        df.columns = ['Amount']
+        #Incase there is more than one column
+        df = df[['Amount']] if 'Amount' in df.columns else df.iloc[:, [0]].rename(columns={df.columns[0]: 'Amount'})
         #Reset the index and name the index column
         df.reset_index(inplace=True)
         df.rename(columns={'index': 'Description'}, inplace=True)
@@ -749,11 +753,9 @@ footer {
         df1 = df1.map(self.format_data)
         df1.columns = pd.MultiIndex.from_product([[(f"Transaction Date: {date}; Generated on: {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')}")], df1.columns])
         table = build_table(df1, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
-    
-        
         with open("Compact_Report.html","w+") as file:
             file.write(table)
-        #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
+            #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
         
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
@@ -886,7 +888,7 @@ footer {
             )
             #Add Most Recent Transaction Date
             plt.gcf().text(0.685, 0.35, textstr, fontsize=14, color='green')
-            plt.gcf().text(0.685, 0.30, f"Transaction Date:\n{most_recent_date.strftime('%d-%m-%Y')}", fontsize=14, color='blue') #Adjust position as needed
+            plt.gcf().text(0.685, 0.30, f"Transaction Date:\n{date}", fontsize=14, color='blue') #Adjust position as needed
 
             plt.xlabel("Amount")
             plt.ylabel("Description")
@@ -894,4 +896,3 @@ footer {
             plt.close()
         else:
             pass #Do nothing
-

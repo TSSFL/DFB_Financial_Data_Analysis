@@ -531,9 +531,9 @@ class FinancialReport:
          self.df.insert(self.df.columns.get_loc('EXCESS/LOSS') + 2, 'EXCESS/LOSS', self.df.pop('EXCESS/LOSS'))
 
          #Total cash inflow
-         self.df.insert(self.df.columns.get_loc('TOTAL FLOAT') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'EXCESS', 'DEBIT']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL FLOAT') + 1, 'TOTAL CASH INFLOW', self.df.loc[:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'EXCESS']].sum(numeric_only=True, axis=1))
          #Total cash outflow
-         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES', 'CREDIT']].sum(numeric_only=True, axis=1))
+         self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES']].sum(numeric_only=True, axis=1))
          
          #Move and rearrange columns
          cols_to_left = ['Timestamp', 'Name of Submitter']

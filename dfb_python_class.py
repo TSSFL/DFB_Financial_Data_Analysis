@@ -217,7 +217,7 @@ class FinancialReport:
     def generate_html_table(self, df, output_file):
         df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Generated at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
 
-        df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True,
+        df_html = build_table(df, 'green_light', font_size='medium', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True,
         even_color='darkblue', even_bg_color='#c3d9ff')
         style = """
         <style scoped>
@@ -233,12 +233,11 @@ class FinancialReport:
         top: 0;
         background: green;
         color: darkblue;
-        z-index: 1.5; /* Ensure it's above tbody */
         }
     
         .dataframe thead th:first-child {
         left: 0;
-        z-index: 1; /* Ensure it's above other headers - z-index: 1; */
+        z-index: 1;
         }
     
         .dataframe tbody tr th:only-of-type {
@@ -252,27 +251,6 @@ class FinancialReport:
         background: blue;
         color: green;
         vertical-align: top;
-        z-index: 1; /* Ensure it sits below thead */
-        }
-        /* Recently added */       
-        .table-outer {
-        overflow-x: auto;
-        height: calc(100vh - 100px); /* full height minus header and footer */
-        }
-
-        header {
-        height: 60px;
-        }
-
-        footer {
-        height: 60px;
-        }
-
-        /* Optional: Add responsiveness */
-        @media (max-width: 600px) {
-        .dataframe {
-        font-size: 16px; /* Adjust font size for small screens */
-        }
         }
         </style>
         """
@@ -785,7 +763,7 @@ class FinancialReport:
         df1 = df #Redefine df for tabular formatted data
         df1 = df1.map(self.format_data)
         df1.columns = pd.MultiIndex.from_product([[(f"Transaction Date: {date}; Generated on: {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')}")], df1.columns])
-        table = build_table(df1, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
+        table = build_table(df1, 'green_light', font_size='medium', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
         with open("Compact_Report.html","w+") as file:
             file.write(table)
             #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])

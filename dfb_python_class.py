@@ -88,7 +88,7 @@ class FinancialReport:
         return self.df
         
     def date_time(self, df):
-        df['Timestamp'] = pd.to_datetime(df['Timestamp']).dt.strftime('%d/%m/%Y %H:%M:%S')
+        df['Date of Submission'] = pd.to_datetime(df['Date of Submission']).dt.strftime('%d/%m/%Y %H:%M:%S')
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction']).dt.strftime('%d/%m/%Y')
         
         return df
@@ -434,9 +434,9 @@ class FinancialReport:
     def summary_df(self, df):
         #Remove columns that starts with TOTAL and those contained the keywords shown
         summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|CREDIT|DEBIT|Details|INCIDENTS', case=False)]
-        cols = summary_df.columns.drop(['Timestamp', 'Date of Transaction'])
+        cols = summary_df.columns.drop(['Date of Submission', 'Date of Transaction'])
         sorted_cols = sorted(cols)
-        summary_df = summary_df[['Timestamp', 'Name of Submitter'] + sorted_cols + ['Date of Transaction']]
+        summary_df = summary_df[['Date of Submission', 'Name of Submitter', 'Date of Transaction'] + sorted_cols]
         return summary_df
     
     def rearrange_columns(self, df):
@@ -740,9 +740,10 @@ class FinancialReport:
          #Total cash outflow
          self.df.insert(self.df.columns.get_loc('TOTAL CASH INFLOW') + 1, 'TOTAL CASH OUTFLOW', self.df.loc[:, ['TRANSFER FEES', 'SALARIES','EXPENDITURES']].sum(numeric_only=True, axis=1))
          
+         self.df.rename(columns={'Timestamp': 'Date of Submission'}, inplace=True) 
          #Move and rearrange columns
-         cols_to_left = ['Timestamp', 'Name of Submitter']
-         cols_to_right = ['CREDIT Details', 'CREDIT PAID Details', 'DEBIT Details', 'DEBIT PAID Details', 'CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS', 'Date of Transaction']
+         cols_to_left = ['Date of Submission', 'Name of Submitter', 'Date of Transaction']
+         cols_to_right = ['CREDIT Details', 'CREDIT PAID Details', 'DEBIT Details', 'DEBIT PAID Details', 'CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
          
          #Move CREDIT and DEBIT columns next to EXCESS/LOSS column
          self.df = self.df.reindex(columns=(list(self.df.columns.drop(['CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID', 'EXCESS/LOSS'])) + ['EXCESS/LOSS', 'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID']))
@@ -963,7 +964,7 @@ class FinancialReport:
         print("Number of duplicate rows found:", duplicate_count)
        
         #Filter or subset the df to exclude columns names with the given keywords
-        df_selected = df_selected[[col for col in df_selected.columns if not any(keyword in col for keyword in ["Timestamp", "Submitter", "Transaction", "Details", "INCIDENTS"])]]
+        df_selected = df_selected[[col for col in df_selected.columns if not any(keyword in col for keyword in ["Submission", "Submitter", "Transaction", "Details", "INCIDENTS"])]]
         if df_selected.empty:
             print("No valid data to display.")
             return  #Exit the function early if no valid data

@@ -419,10 +419,10 @@ class FinancialReport:
             
         return df_html
     
-    def min_report(self, df):
-        pass
-        return min_report
-        
+    def mini_report(self, df):
+        mini_df = df[['Date of Transaction'] + list(df.loc[:, 'ACTUAL OPERATING CAPITAL':'DEBIT PAID'].columns)]
+        return mini_df
+            
     #This method is for brief report - select a df subset
     def subset_df(self, df):
         #Subset a dataframe
@@ -721,7 +721,7 @@ class FinancialReport:
              self.df = self.consolidate_transactions(self.df) #Consolidate multiple rows for the same date
              #Expected here means the capital that you should now have compared to the previous one
              #Compute loss/excess
-             self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT PAID']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
+             self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'CREDIT']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT PAID']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
              self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
          #Excess/Loss
@@ -763,8 +763,12 @@ class FinancialReport:
          df = df.map(self.format_data)
          df = self.date_time(df)
          
-         #Full report
-         if report_type == 'brief':
+         #Reports
+         if report_type == 'mini':
+             df = self.mini_report(df)
+             output_file = 'Mini_DFB_Report.html'
+             
+         elif report_type == 'brief':
             df = self.subset_df(df)
             output_file = 'Brief_DFB_Report.html'
             
@@ -1129,3 +1133,4 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
+

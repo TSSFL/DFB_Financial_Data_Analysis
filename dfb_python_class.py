@@ -88,50 +88,186 @@ class FinancialReport:
         return self.df
         
     def date_time(self, df):
-        df['Timestamp'] = pd.to_datetime(df['Timestamp']).dt.strftime('%m/%d/%Y %H:%M:%S')
+        df['Timestamp'] = pd.to_datetime(df['Timestamp']).dt.strftime('%d/%m/%Y %H:%M:%S')
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction']).dt.strftime('%d/%m/%Y')
         
         return df
         
+    def update_operating_capital(self, df):
+        """
+        Updates the 'ACTUAL OPERATING CAPITAL' column based on 'DEBIT',
+        handling duplicate dates.
+        Args:
+            df: The Pandas DataFrame with a 'Date of Transaction' column.
+        Returns:
+            The updated DataFrame.
+        """
+        #Sort by 'Date of Transaction' to ensure correct processing of duplicates
+        df.sort_values(by='Date of Transaction', inplace=True)
+
+        #Group by 'Date of Transaction'
+        grouped = df.groupby('Date of Transaction')
+
+        #Modify DEBIT and DEBIT PAID within each group
+        for date, group in grouped:
+            last_index = group.index[-1]  #Get the index of the last row in the group
+            debit_sum = group['DEBIT'].sum()
+            debit_paid_sum = group['DEBIT PAID'].sum()
+
+            df.loc[group.index[:-1], 'DEBIT'] = 0  # Set DEBIT to 0 for all but the last row
+            df.loc[last_index, 'DEBIT'] = debit_sum  # Set DEBIT sum in the last row
+
+            df.loc[group.index[:-1], 'DEBIT PAID'] = 0  #Set DEBIT PAID to 0 for all but the last row
+            df.loc[last_index, 'DEBIT PAID'] = debit_paid_sum #set DEBIT PAID sum in the last row
+
+        #Now calculate cumulative sum and update ACTUAL OPERATING CAPITAL (after handling duplicates)
+        df['DEBIT_CUMSUM'] = df['DEBIT'].cumsum()
+        df['ACTUAL OPERATING CAPITAL'] = df['ACTUAL OPERATING CAPITAL'] + df['DEBIT_CUMSUM']
+        df.drop(['DEBIT_CUMSUM'], axis=1, inplace=True)
+        return df
+        
+    """
+    #Simple method does not take multiple submissions in a single date
+    def update_operating_capital(self, df):
+        #Calculate cumulative sum of DEBIT
+        df['DEBIT_CUMSUM'] = df['DEBIT'].cumsum()
+        #Add the cumulative DEBIT to the initial ACTUAL OPERATING CAPITAL
+        df['ACTUAL OPERATING CAPITAL'] = df['ACTUAL OPERATING CAPITAL'] + df['DEBIT_CUMSUM']
+        df.drop(['DEBIT_CUMSUM'], axis=1, inplace=True) #Remove helper columns
+        return df
+    """
+    def consolidate_transactions_insert_new_summed_row(self, df):
+        """
+        Consolidates rows in a Pandas DataFrame with the same 'Date of Transaction' by summing numerical columns 
+        and handling string columns as specified.
+        Args:
+            df: The input DataFrame.
+        Returns:
+            A new DataFrame with the consolidated rows added.
+        """
+        #Group by 'Date of Transaction'
+        grouped = df.groupby('Date of Transaction')
+
+        new_rows = []
+        for date, group in grouped:
+            if len(group) > 1:  #Only process groups with more than one row
+                new_row = {}
+
+                for col in df.columns:
+                    if 'Details' in col or 'INCIDENTS' in col or 'DAY NAME' in col:
+                        #Concatenate non-empty strings with ';'
+                        strings = [s for s in group[col].astype(str) if s.strip()]  #added strip() to remove spaces and make it efficient
+                        new_row[col] = '; '.join(strings) if strings else None  #Handle empty list case
+                    elif col == 'Name of Submitter':
+                        #Extract first names and concatenate with ';'
+                        names = [str(s).split()[0] for s in group[col] if str(s).strip()] # Check for empty or only space strings
+                        new_row[col] = '; '.join(names) if names else None  #Handle empty list case
+
+                    elif col == 'Timestamp':
+                        #Get date and most recent time 
+                        dates = pd.to_datetime(group['Timestamp'], errors='coerce')  #handle invalid Timestamps
+                        if not dates.empty: #Added to check for NaT values due to invalid timestamp formats
+                            most_recent_datetime = dates.max()
+                            #first_row[col] = group[col].iloc[-1].strftime('%m/%d/%Y %H:%M:%S') #Take the last time -1, first time - 0
+                            new_row[col] = most_recent_datetime.strftime('%m/%d/%Y %H:%M:%S') if not pd.isnull(most_recent_datetime) else None  #added isnull check
+                            print(new_row[col])
+                    elif pd.api.types.is_numeric_dtype(df[col]):
+                        #Sum numeric columns
+                        new_row[col] = group[col].sum()
+                    else:
+                        #Take the first value for other columns
+                        new_row[col] = group[col].iloc[0]
+
+                new_rows.append(new_row)
+
+        #Create a new DataFrame from the consolidated rows
+        df_new = pd.DataFrame(new_rows)
+        
+        #Concatenate the original DataFrame and the new DataFrame
+        df_result = pd.concat([df, df_new], ignore_index=True)
+        
+        #Sort the resulting DataFrame by 'Date of Transaction' if needed
+        df_result = df_result.sort_values(by='Date of Transaction', na_position='first').reset_index(drop=True)
+
+        return df_result
+    
+    def consolidate_transactions(self, df):
+        #Convert 'Date of Transaction' and 'Timestamp' to datetime objects
+        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'])
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+
+        #Group by 'Date of Transaction'
+        grouped = df.groupby('Date of Transaction')
+
+        #Function to aggregate rows within a group
+        def aggregate_rows(group):
+            first_row = group.iloc[0].copy()  #Start with the first row's values
+
+            #Special handling for specific columns
+            for col in group.columns:
+                if any(keyword in col for keyword in ['Details', 'INCIDENTS', 'DAY NAME']):
+                    non_empty_strings = [s for s in group[col].astype(str) if s.strip()] #ignore empty strings
+                    first_row[col] = '; '.join(non_empty_strings) if non_empty_strings else '' #Avoid ; when the list is empty or has empty string
+                elif col == 'Name of Submitter':
+                    #first_row[col] = '; '.join(group[col].str.split().str[0].dropna())
+                    first_row[col] = '; '.join(group[col].str.split().str[0].map(str).dropna()) #Map to string type to handle mixed types correctly
+                elif col == 'Timestamp':
+                   first_row[col] = group[col].iloc[-1].strftime('%m/%d/%Y %H:%M:%S') #Take the last time -1, first time - 0
+                elif pd.api.types.is_numeric_dtype(group[col]):
+                    first_row[col] = group[col].sum()
+
+            return first_row
+            
+        #Apply the aggregation function and reset the index
+        consolidated_df = grouped.apply(aggregate_rows).reset_index(drop=True)
+        return consolidated_df
+        
+    def calculate_expected_capital(self, df):
+        """
+        Calculates the EXPECTED OPERATING CAPITAL based on previous day's 
+        ACTUAL OPERATING CAPITAL and other financial data.
+
+        Args:
+            df: Pandas DataFrame with 'Name of Submitter', 'Date of Transaction',
+                'ACTUAL OPERATING_CAPITAL', 'TOTAL COMMISSION', 'CAPITAL INFUSION',
+                'TRANSFER FEES', 'SALARIES', and 'EXPENDITURES' columns.
+
+        Returns:
+            Pandas DataFrame with updated 'EXPECTED_OPERATING CAPITAL' column.
+        """
+
+        #Ensure the DataFrame is sorted by submitter and date
+        df = df.sort_values(['Name of Submitter', 'Date of Transaction'])
+
+        #Convert 'Date of Transaction' to datetime objects if not already
+        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'])
+
+        df['EXPECTED OPERATING CAPITAL'] =  df['ACTUAL OPERATING CAPITAL']  #Initialize the column
+
+        for submitter in df['Name of Submitter'].unique():
+            submitter_df = df[df['Name of Submitter'] == submitter].copy()  #Crucial: use .copy() to avoid SettingWithCopyWarning
+
+            for i in range(1, len(submitter_df)):  #Iterate from the second row onwards for each submitter
+                prev_actual = submitter_df['ACTUAL OPERATING CAPITAL'].iloc[i-1]
+                commission = submitter_df['TOTAL COMMISSION'].iloc[i]
+                infusion = submitter_df['CAPITAL INFUSION'].iloc[i]
+                fees = submitter_df['TRANSFER FEES'].iloc[i]
+                salaries = submitter_df['SALARIES'].iloc[i]
+                expenditures = submitter_df['EXPENDITURES'].iloc[i]
+
+                expected = prev_actual + commission + infusion - fees - salaries - expenditures
+
+                submitter_df.loc[submitter_df.index[i], 'EXPECTED OPERATING CAPITAL'] = expected #Use .loc with boolean indexing
+
+            df.loc[submitter_df.index, 'EXPECTED OPERATING CAPITAL'] = submitter_df['EXPECTED OPERATING CAPITAL']  #Update original df
+            #df = df.sort_values('Date of Transaction') #Delete this and the below line to maintain order by names
+            #df = df.reset_index(drop=True) #Maintain date order from low to highest
+        return df
+                       
     def calculations(self, df):
         df = df.copy()
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
-    
-        def consolidate_transactions(df):
-            #Convert 'Date of Transaction' and 'Timestamp' to datetime objects
-            df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'])
-            df['Timestamp'] = pd.to_datetime(df['Timestamp'])
-
-            #Group by 'Date of Transaction'
-            grouped = df.groupby('Date of Transaction')
-
-            #Function to aggregate rows within a group
-            def aggregate_rows(group):
-                first_row = group.iloc[0].copy()  #Start with the first row's values
-
-                #Special handling for specific columns
-                for col in group.columns:
-                    if any(keyword in col for keyword in ['Details', 'INCIDENTS', 'DAY NAME']):
-                        non_empty_strings = [s for s in group[col].astype(str) if s.strip()] #ignore empty strings
-                        first_row[col] = '; '.join(non_empty_strings) if non_empty_strings else '' #avoid ; when the list is empty or has empty string
-                    elif col == 'Name of Submitter':
-                        #first_row[col] = '; '.join(group[col].str.split().str[0].dropna())
-                        first_row[col] = '; '.join(group[col].str.split().str[0].map(str).dropna()) # map to string type to handle mixed types correctly
-                    elif col == 'Timestamp':
-                        first_row[col] = group[col].iloc[-1].strftime('%m/%d/%Y %H:%M:%S') #Take the last time -1, first time - 0
-                    elif pd.api.types.is_numeric_dtype(group[col]):
-                        first_row[col] = group[col].sum()
-
-                return first_row
-            
-            #Apply the aggregation function and reset the index
-            consolidated_df = grouped.apply(aggregate_rows).reset_index(drop=True)
-            return consolidated_df
-            
-        df = consolidate_transactions(df)
-        #print(consolidated_df)
-
         #Replace 0, '', nan with float 0.00
         keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS', 'CREDIT', 'DEBIT']
         keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
@@ -218,11 +354,11 @@ class FinancialReport:
         df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Generated at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
 
         df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True,
-        even_color='darkblue', even_bg_color='#c3d9ff')
+        even_color='darkblue', even_bg_color='#c3d9ff') #1240 px
         style = """
         <style scoped>
         .dataframe-div {
-        max-height: 1240px;
+        max-height: 640px;
         overflow: auto;
         position: relative;
         }
@@ -282,24 +418,46 @@ class FinancialReport:
             file.write(df_html)
             
         return df_html
+    
+    def min_report(self, df):
+        pass
+        return min_report
         
     #This method is for brief report - select a df subset
     def subset_df(self, df):
         #Subset a dataframe
         subset_df = df[[col for col in df.columns if any(kw in col for kw in ["Timestamp", "Submitter", "TOTAL", "AGENCY", "BUNDLES", "ACTUAL", "EXPECTED", "INFUSION", "TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Transaction", "INCIDENTS"])]]
-
-            
+        
         return subset_df
         
     #Subset a df for Float Summary
     def summary_df(self, df):
         #Remove columns that starts with TOTAL and those contained the keywords shown
-        summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('Submitter|COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|CREDIT|DEBIT|Details|INCIDENTS', case=False)]
+        summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|CREDIT|DEBIT|Details|INCIDENTS', case=False)]
         cols = summary_df.columns.drop(['Timestamp', 'Date of Transaction'])
         sorted_cols = sorted(cols)
-        summary_df = summary_df[['Timestamp'] + sorted_cols + ['Date of Transaction']]
+        summary_df = summary_df[['Timestamp', 'Name of Submitter'] + sorted_cols + ['Date of Transaction']]
         return summary_df
-        
+    
+    def rearrange_columns(self, df):
+        """Rearranges DataFrame columns alphabetically, keeping specific columns in place."""
+        fixed_cols = [col for col in df.columns if col.startswith("TOTAL") or 
+                 "INFLOW" in col or "OUTFLOW" in col]
+        movable_cols = sorted([col for col in df.columns if col not in fixed_cols])
+
+        #More efficient way to interleave the lists
+        reordered_cols = []
+        fixed_iter = iter(fixed_cols)
+        movable_iter = iter(movable_cols)
+
+        for col in df.columns:
+            if col in fixed_cols:
+                reordered_cols.append(next(fixed_iter))
+            else:
+                reordered_cols.append(next(movable_iter))
+
+        return df[reordered_cols]
+    
     def _full_report(self, report_type = "default_report_type"):
          if self.data_source == 'google_drive':
             self.df = pd.DataFrame(self.data).copy()
@@ -307,7 +465,7 @@ class FinancialReport:
             self.df = self.data.copy()
          else: #Kobo
               self.df = self.df.copy()
-            
+         
          #Calculations for total lipa charges, total transfer fees, total mobile commission, total bank commission, etc.
          if self.df is None:
             print("DataFrame is not available. Please call process_data() first.")
@@ -392,7 +550,7 @@ class FinancialReport:
                  #Add more sophisticated string cleaning below if needed
              #Replace NaNs, 0, and empty strings with 0.0
              self.df[col] = self.df[col].fillna(0.0).replace('', 0.0) 
-             
+    
          #NORMAL MOBILE FLOAT TOTAL
          #Keywords to exclude
          exclude_keywords = ["BANK", "COMM", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", 
@@ -544,15 +702,27 @@ class FinancialReport:
              self.df['TOTAL FLOAT'] = self.df[cols].sum(axis=1)
          else: 
              print("TOTAL FLOAT: No Matching columns")
-    
+         
+         #Sort the dataframe alphabetically
+         #self.df = self.rearrange_columns(self.df) #Apply this method or
+         #self.df = self.df.reindex(sorted(self.df.columns), axis=1)  #Most efficient one liner
+         self.df = self.df[[col for col in self.df.columns if col not in ['CAPITAL INFUSION', 'SALARIES', 'EXPENDITURES', 'TRANSFER FEES', 'HARD CASH', 'TOTAL FLOAT']] + ['CAPITAL INFUSION', 'SALARIES', 'EXPENDITURES', 'TRANSFER FEES', 'HARD CASH'] + ['TOTAL FLOAT']]
+         
          #Calculate the sum of the specified columns
-         self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT'] +  self.df['DEBIT']
+         self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
+         self.df = self.update_operating_capital(self.df)
+         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL'] - self.df['DEBIT PAID']
          
-         #Expected here means the capital that you should now have compared to the previous one
-         #Compute loss/excess
-         self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1)) #Diduct DEBIT PAID, and CREDIT PAID
-         
-         self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
+         if report_type == 'comp':
+             self.df = self.calculate_expected_capital(self.df)
+             self.df = self.consolidate_transactions_insert_new_summed_row(self.df)
+             
+         else:
+             self.df = self.consolidate_transactions(self.df) #Consolidate multiple rows for the same date
+             #Expected here means the capital that you should now have compared to the previous one
+             #Compute loss/excess
+             self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT PAID']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
+             self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
          #Excess/Loss
          self.df.insert(self.df.columns.get_loc('EXPECTED OPERATING CAPITAL') + 1, 'EXCESS/LOSS', self.df['ACTUAL OPERATING CAPITAL'] - self.df['EXPECTED OPERATING CAPITAL'])
@@ -572,16 +742,23 @@ class FinancialReport:
          
          #Move and rearrange columns
          cols_to_left = ['Timestamp', 'Name of Submitter']
-         cols_to_right = ['CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'CREDIT Details', 'DEBIT Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS', 'Date of Transaction']
+         cols_to_right = ['CREDIT Details', 'CREDIT PAID Details', 'DEBIT Details', 'DEBIT PAID Details', 'CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS', 'Date of Transaction']
          
-         #Check if 'MOBILE BUNDLES and SHARES Details' exists and add it to the beginning of cols_to_right
+         #Move CREDIT and DEBIT columns next to EXCESS/LOSS column
+         self.df = self.df.reindex(columns=(list(self.df.columns.drop(['CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID', 'EXCESS/LOSS'])) + ['EXCESS/LOSS', 'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID']))
+         
+         #Check if 'MOBILE BUNDLES and SHARES Details' exists and add it to the list of cols_to_right
          if 'MOBILE BUNDLES and SHARES Details' in self.df.columns:
-             cols_to_right.insert(0, 'MOBILE BUNDLES and SHARES Details')
+             cols_to_right.insert(4, 'MOBILE BUNDLES and SHARES Details')
          other_cols = [col for col in self.df.columns if col not in cols_to_left + cols_to_right]
 
          self.df = self.df[cols_to_left + other_cols + cols_to_right]
          
-         df = self.calculations(self.df)
+         if report_type != 'comp':  #Skip calculations if report_type is 'comprehensive'
+             df = self.calculations(self.df)
+         else:
+            df = self.df  #Directly use self.df without calculations
+            
          df = df.map(self.format_data)
          df = self.date_time(df)
          
@@ -593,12 +770,15 @@ class FinancialReport:
          elif report_type == 'summary':
              df = self.summary_df(df)
              output_file = 'Summary_DFB_Report.html'
-         
+        
+         elif report_type == 'comp':
+             output_file = 'Extended_DFB_Report.html'
+        
          else:
             output_file = 'Full_DFB_Report.html'
 
          self.generate_html_table(df, output_file)
-        
+    
          return self.df
         
     #Slice a dataframe based on a month for all years - full report
@@ -735,9 +915,16 @@ class FinancialReport:
         #Reports
         if report_type == 'brief':
             df = self.subset_df(df)
-            output_file = f'Brief_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html' #Dynamic file name
+            output_file = f'Brief_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html'
+            
+        elif report_type == 'full':
+            output_file = f'Full_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html' 
+            
+        elif report_type == 'summary':
+            otput_file = f'Summary_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html'
+            
         else:
-            output_file = f'Full_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html'  #Dynamic file name
+            output_file = f'Extended_DFB_Report_{start_date.strftime("%d%m%Y")}_{end_date.strftime("%d%m%Y")}.html'
 
         self.generate_html_table(df, output_file)
 
@@ -747,12 +934,22 @@ class FinancialReport:
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
         most_recent_date = df['Date of Transaction'].max().strftime('%d/%m/%Y')
         df = self.date_time(df)
-        date = date
         
+        date = date
         duplicate_count = 0
         if date is None:
             date = most_recent_date
-            df_selected = df[df['Date of Transaction'] == most_recent_date].copy()  #Use most recent date if none provided
+            #df_selected = df[df['Date of Transaction'] == most_recent_date].copy()  #Use most recent date if none provided
+            df_selected_initial = df[df['Date of Transaction'] == most_recent_date].copy()  # Use most recent date if none provided
+            #Filter for rows where 'Name of Submitter' has two strings separated by ';'
+            df_selected = df_selected_initial[df_selected_initial['Name of Submitter'].str.contains(';', na=False)]
+
+            #If multiple rows match the criteria, pick the last one
+            if len(df_selected) > 1:
+                df_selected = df_selected.head(-1) 
+            #If no rows match criteria after the semicolon check, fall back to the original behavior.
+            if df_selected.empty:
+                df_selected = df_selected_initial.sample(n=1)
         else:
             filtered_df = df[df['Date of Transaction'] == date]
             if filtered_df.empty:
@@ -772,7 +969,7 @@ class FinancialReport:
             return  #Exit the function early if no valid data
         df = df_selected.T
         #df.columns = ['Amount']
-        df = df[['Amount']] if 'Amount' in df.columns else df.iloc[:, [0]].rename(columns={df.columns[0]: 'Amount'})
+        df = df[['Amount']] if 'Amount' in df.columns else df.iloc[:, [0]].rename(columns={df.columns[0]: 'Amount'}) #Take last row
         #Reset the index and name the index column
         df.reset_index(inplace=True)
         df.rename(columns={'index': 'Description'}, inplace=True)
@@ -781,15 +978,17 @@ class FinancialReport:
             
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
-        
+         
         df1 = df #Redefine df for tabular formatted data
+        df1.rename(columns={0: 'Description'}, inplace=True)
         df1 = df1.map(self.format_data)
         df1.columns = pd.MultiIndex.from_product([[(f"Transaction Date: {date}; Generated on: {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')}")], df1.columns])
         table = build_table(df1, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True, even_color='darkblue',   even_bg_color='#c3d9ff')
         with open("Compact_Report.html","w+") as file:
             file.write(table)
             #HTML(string=table).write_pdf("Compact_Report.pdf", stylesheets=[CSS(string='@page { size: landscape }')])
-        
+            
+        df.rename(columns={0: 'Description'}, inplace=True)    
         #plt.style.use('ggplot')
         sns.set_style('darkgrid') # darkgrid, white grid, dark, white and ticks
         plt.rc('axes', titlesize=18)     #Fontsize of the axes title
@@ -929,4 +1128,3 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
-

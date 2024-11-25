@@ -369,12 +369,11 @@ class FinancialReport:
         top: 0;
         background: green;
         color: darkblue;
-        z-index: 1.5; /* Ensure it's above tbody */
         }
     
         .dataframe thead th:first-child {
         left: 0;
-        z-index: 1; /* Ensure it's above other headers - z-index: 1; */
+        z-index: 1;
         }
     
         .dataframe tbody tr th:only-of-type {
@@ -388,27 +387,6 @@ class FinancialReport:
         background: blue;
         color: green;
         vertical-align: top;
-        z-index: 1; /* Ensure it sits below thead */
-        }
-        /* Recently added */       
-        .table-outer {
-        overflow-x: auto;
-        height: calc(100vh - 100px); /* full height minus header and footer */
-        }
-
-        header {
-        height: 60px;
-        }
-
-        footer {
-        height: 60px;
-        }
-
-        /* Optional: Add responsiveness */
-        @media (max-width: 600px) {
-        .dataframe {
-        font-size: 16px; /* Adjust font size for small screens */
-        }
         }
         </style>
         """
@@ -1133,4 +1111,3 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
-

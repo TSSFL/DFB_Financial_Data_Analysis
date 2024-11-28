@@ -114,8 +114,8 @@ class FinancialReport:
             debit_sum = group['DEBIT'].sum()
             debit_paid_sum = group['DEBIT PAID'].sum()
 
-            df.loc[group.index[:-1], 'DEBIT'] = 0  # Set DEBIT to 0 for all but the last row
-            df.loc[last_index, 'DEBIT'] = debit_sum  # Set DEBIT sum in the last row
+            df.loc[group.index[:-1], 'DEBIT'] = 0  #Set DEBIT to 0 for all but the last row
+            df.loc[last_index, 'DEBIT'] = debit_sum  #Set DEBIT sum in the last row
 
             df.loc[group.index[:-1], 'DEBIT PAID'] = 0  #Set DEBIT PAID to 0 for all but the last row
             df.loc[last_index, 'DEBIT PAID'] = debit_paid_sum #set DEBIT PAID sum in the last row
@@ -263,26 +263,53 @@ class FinancialReport:
             #df = df.sort_values('Date of Transaction') #Delete this and the below line to maintain order by names
             #df = df.reset_index(drop=True) #Maintain date order from low to highest
         return df
-                       
+    
+    def clean_numeric_columns(self, df):
+        """
+        Cleans numeric columns in a DataFrame:
+        - Converts series of zeros (e.g., "00", "000") to "0.00".
+        - Removes leading zeros from numbers (e.g., "0123" -> "123.00").
+        - Replaces NaNs, empty strings, and "0" with float 0.00.
+        - Leaves excluded columns untouched.
+
+        Parameters:
+            df (pd.DataFrame): The input DataFrame to clean.
+
+        Returns:
+            pd.DataFrame: The cleaned DataFrame.
+        """
+        #Keywords to exclude
+        keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submission', 'Submitter', 'Timestamp', 'DAY NAME']
+    
+        #Select relevant columns (exclude those with keywords in their names)
+        relevant_cols = [col for col in df.columns if not any(keyword in col for keyword in keywords_exclude)]
+    
+        #Process each relevant column
+        for col in relevant_cols:
+            try:
+                #Convert all values in the column to strings for cleaning
+                df[col] = df[col].astype(str)
+                #Handle cases of series of 0s (e.g., "00", "000") by replacing them with "0.00"
+                df[col] = df[col].replace(r'^0+$', '0.00', regex=True)
+                #Remove leading zeros from numbers (e.g., "0123" -> "123", "0045678" -> "45678") and ensure float format
+                df[col] = df[col].replace(r'^0*(\d+)$', r'\1.00', regex=True)
+                #Replace NaNs, empty strings, and "0" with float 0.00
+                df[col] = df[col].replace(['', ' ', '0', np.nan], '0.00')
+                #Convert the column back to numeric (float)
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.00)
+                #Format all floats to two decimal places (e.g., "2000.00", "23.00")
+                df[col] = df[col].apply(lambda x: float(f"{x:.2f}"))
+            except Exception as e:
+                print(f"Error processing column '{col}': {e}")
+    
+        #Return the cleaned DataFrame
+        return df
     def calculations(self, df):
         df = df.copy()
         df = df.reset_index(drop=True)  #Reset the existing index
         df.index = df.index + 1       #Add 1 to the reset index
-        #Replace 0, '', nan with float 0.00
-        keywords_include = ['COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS', 'CREDIT', 'DEBIT']
-        keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
-        #Select relevant columns
-        relevant_cols = [col for col in df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
-        for col in relevant_cols:
-            try:
-                #Attempt direct conversion to numeric, coercing errors to NaN
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            except TypeError:  # Handle cases where pd.to_numeric might fail
-                print(f"Column '{col}' could not be converted directly. Attempting string cleaning.")
-                #Add more sophisticated string cleaning below if needed
-            #Replace NaNs, 0, and empty strings with 0.0
-            df[col] = df[col].fillna(0.0).replace('', 0.0)
-            
+        
+        df = self.clean_numeric_columns(self.df)        
         #Sum columns
         keywords = ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'CREDIT', 'DEBIT']
         exclusions = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
@@ -304,7 +331,7 @@ class FinancialReport:
             #Filter columns based on keywords and exclude keywords
             filtered_columns = []
             for col in df_calc.columns:
-                if (not keywords or any(keyword in col.upper() for keyword in keywords)) and not any(exclude_keyword in col.upper() for exclude_keyword in exclusions):  # Case-insensitive matching
+                if (not keywords or any(keyword in col.upper() for keyword in keywords)) and not any(exclude_keyword in col.upper() for exclude_keyword in exclusions):  #Case-insensitive matching
                     filtered_columns.append(col)
 
             if not filtered_columns:
@@ -513,22 +540,8 @@ class FinancialReport:
                  self.df[list(group)] = self.df[list(group)].apply(pd.to_numeric, errors='coerce')
                  #Calculate sum and insert new column
                  self.df.insert(self.df.columns.get_loc(group[-1]) + 1, total_col_name, self.df[list(group)].sum(axis=1))
-          
-         #Replace 0, '', nan with float 0.00
-         keywords_include = ['BANK', 'COMM', 'LIPA', 'AGENCY', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'EXCESS/LOSS', 'CREDIT', 'DEBIT']
-         keywords_exclude = ['Details', 'INCIDENTS', 'Transaction', 'Submitter', 'Timestamp', 'DAY NAME']
-         #Select relevant columns
-         relevant_cols = [col for col in self.df.columns if any(keyword in col for keyword in keywords_include) and not any(keyword in col for keyword in keywords_exclude)]
-         for col in relevant_cols:
-             try:
-                 #Attempt direct conversion to numeric, coercing errors to NaN
-                 self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
-             except TypeError:  # Handle cases where pd.to_numeric might fail
-                 print(f"Column '{col}' could not be converted directly. Attempting string cleaning.")
-                 #Add more sophisticated string cleaning below if needed
-             #Replace NaNs, 0, and empty strings with 0.0
-             self.df[col] = self.df[col].fillna(0.0).replace('', 0.0) 
-    
+        
+         self.df = self.clean_numeric_columns(self.df)
          #NORMAL MOBILE FLOAT TOTAL
          #Keywords to exclude
          exclude_keywords = ["BANK", "COMM", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", 
@@ -1085,7 +1098,8 @@ class FinancialReport:
             plt.xticks(rotation=90)
             plt.title("Amounts in TZS")
             for i, v in enumerate(df_sorted['Amount']):
-                plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
+                #plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
+                plt.text(v + 10, i, f"{v:.2f}", color='teal', va="center")
                 #plt.text(v+vh, i, str(i+1), color='black', va="center")
                 
             #Define the GMT+3 timezone
@@ -1111,3 +1125,4 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
+

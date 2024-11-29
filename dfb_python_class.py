@@ -702,7 +702,7 @@ class FinancialReport:
          #Calculate the sum of the specified columns
          self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
          self.df = self.update_operating_capital(self.df)
-         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL'] - self.df['DEBIT PAID']
+         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL'] + self.df['DEBIT'] - self.df['DEBIT PAID']
          
          if report_type == 'comp':
              self.df = self.calculate_expected_capital(self.df)
@@ -710,8 +710,8 @@ class FinancialReport:
              
          else:
              self.df = self.consolidate_transactions(self.df) #Consolidate multiple rows for the same date
-             #Expected here means the capital that you should now have compared to the previous one
-             #Compute loss/excess
+             #Expected here means the capital that you should have after some changes compared to the previous one
+             #EXPECTED OPERATING CAPITAL
              self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'CREDIT']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT PAID']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
              self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
@@ -1098,8 +1098,7 @@ class FinancialReport:
             plt.xticks(rotation=90)
             plt.title("Amounts in TZS")
             for i, v in enumerate(df_sorted['Amount']):
-                #plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
-                plt.text(v + 10, i, f"{v:.2f}", color='teal', va="center")
+                plt.text(v+10, i, str(round(v, 4)), color='teal', va="center")
                 #plt.text(v+vh, i, str(i+1), color='black', va="center")
                 
             #Define the GMT+3 timezone

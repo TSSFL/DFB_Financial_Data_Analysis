@@ -119,11 +119,13 @@ class FinancialReport:
 
             df.loc[group.index[:-1], 'DEBIT PAID'] = 0  #Set DEBIT PAID to 0 for all but the last row
             df.loc[last_index, 'DEBIT PAID'] = debit_paid_sum #set DEBIT PAID sum in the last row
-
+            
         #Now calculate cumulative sum and update ACTUAL OPERATING CAPITAL (after handling duplicates)
         df['DEBIT_CUMSUM'] = df['DEBIT'].cumsum()
-        df['ACTUAL OPERATING CAPITAL'] = df['ACTUAL OPERATING CAPITAL'] + df['DEBIT_CUMSUM']
+        df['DEBIT_PAID_CUMSUM'] = df['DEBIT PAID'].cumsum()
+        df['ACTUAL OPERATING CAPITAL'] = df['ACTUAL OPERATING CAPITAL'] + df['DEBIT_CUMSUM'] - df['DEBIT_PAID_CUMSUM']
         df.drop(['DEBIT_CUMSUM'], axis=1, inplace=True)
+        df.drop(['DEBIT_PAID_CUMSUM'], axis=1, inplace=True)
         return df
         
     """
@@ -700,7 +702,7 @@ class FinancialReport:
          #Calculate the sum of the specified columns
          self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
          self.df = self.update_operating_capital(self.df)
-         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL'] - self.df['DEBIT PAID']
+         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL']
          
          if report_type == 'comp':
              self.df = self.calculate_expected_capital(self.df)

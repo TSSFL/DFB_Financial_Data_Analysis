@@ -256,8 +256,10 @@ class FinancialReport:
                 fees = submitter_df['TRANSFER FEES'].iloc[i]
                 salaries = submitter_df['SALARIES'].iloc[i]
                 expenditures = submitter_df['EXPENDITURES'].iloc[i]
-
-                expected = prev_actual + commission + infusion - fees - salaries - expenditures
+                credit = submitter_df['CREDIT'].iloc[i]
+                credit_paid = submitter_df['CREDIT PAID'].iloc[i]
+                
+                expected = prev_actual + commission + infusion + credit - fees - salaries - expenditures - credit_paid
 
                 submitter_df.loc[submitter_df.index[i], 'EXPECTED OPERATING CAPITAL'] = expected #Use .loc with boolean indexing
 
@@ -1127,4 +1129,3 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
-

@@ -306,9 +306,6 @@ class FinancialReport:
         return df
     def calculations(self, df):
         df = df.copy()
-        df = df.reset_index(drop=True)  #Reset the existing index
-        df.index = df.index + 1       #Add 1 to the reset index
-        
         df = self.clean_numeric_columns(self.df)        
         #Sum columns
         keywords = ['COMM', 'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'INFLOW', 'OUTFLOW', 'EXCESS', 'LOSS', 'CREDIT', 'DEBIT']
@@ -363,6 +360,7 @@ class FinancialReport:
         df.loc["COLUMN MAXIMAMUS"] = df.iloc[:-2].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").max(numeric_only=True, axis=0)
         #Column minimums
         df.loc["COLUMN MINIMUMS"] = df.iloc[:-3].filter(regex="^(?!.*(?:Details|INCIDENTS|Transaction|Submitter|Timestamp)).*$").min(numeric_only=True, axis=0)
+        
         return df
         
     def format_data(self, x):
@@ -702,7 +700,7 @@ class FinancialReport:
          #Calculate the sum of the specified columns
          self.df['ACTUAL OPERATING CAPITAL'] = self.df['HARD CASH'] + self.df['TOTAL FLOAT']
          self.df = self.update_operating_capital(self.df)
-         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL'] + self.df['DEBIT'] - self.df['DEBIT PAID']
+         self.df['ACTUAL OPERATING CAPITAL'] = self.df['ACTUAL OPERATING CAPITAL'] - self.df['DEBIT PAID']
          
          if report_type == 'comp':
              self.df = self.calculate_expected_capital(self.df)
@@ -745,6 +743,9 @@ class FinancialReport:
          other_cols = [col for col in self.df.columns if col not in cols_to_left + cols_to_right]
 
          self.df = self.df[cols_to_left + other_cols + cols_to_right]
+         
+         self.df = self.df.reset_index(drop=True)
+         self.df.index = self.df.index + 1
          
          if report_type != 'comp':  #Skip calculations if report_type is 'comprehensive'
              df = self.calculations(self.df)

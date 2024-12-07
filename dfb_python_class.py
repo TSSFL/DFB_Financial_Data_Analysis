@@ -441,7 +441,7 @@ class FinancialReport:
     def summary_df(self, df):
         #Remove columns that starts with TOTAL and those contained the keywords shown
         summary_df = df.loc[:, ~df.columns.str.startswith('TOTAL') & ~df.columns.str.contains('COMM|LIPA|INFUSION|TRANSFER|SALARIES|EXPENDITURES|HARD|ACTUAL|EXPECTED|EXCESS|LOSS|CREDIT|DEBIT|Details|INCIDENTS', case=False)]
-        cols = summary_df.columns.drop(['Date of Submission', 'Date of Transaction'])
+        cols = summary_df.columns.drop(['Date of Submission', 'Name of Submitter', 'Date of Transaction'])
         sorted_cols = sorted(cols)
         summary_df = summary_df[['Date of Submission', 'Name of Submitter', 'Date of Transaction'] + sorted_cols]
         return summary_df
@@ -1129,3 +1129,4 @@ class FinancialReport:
             plt.close()
         else:
             pass #Do nothing
+

@@ -736,10 +736,10 @@ class FinancialReport:
          self.df.rename(columns={'Timestamp': 'Date of Submission'}, inplace=True) 
          #Move and rearrange columns
          cols_to_left = ['Date of Submission', 'Name of Submitter', 'Date of Transaction']
-         cols_to_right = ['CREDIT Details', 'CREDIT PAID Details', 'DEBIT Details', 'DEBIT PAID Details', 'CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
+         cols_to_right = ['DEBIT Details', 'DEBIT PAID Details', 'CREDIT Details', 'CREDIT PAID Details', 'CAPITAL INFUSION Details', 'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details', 'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
          
          #Move CREDIT and DEBIT columns next to EXCESS/LOSS column
-         self.df = self.df.reindex(columns=(list(self.df.columns.drop(['CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID', 'EXCESS/LOSS'])) + ['EXCESS/LOSS', 'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID']))
+         self.df = self.df.reindex(columns=(list(self.df.columns.drop(['CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID', 'EXCESS/LOSS'])) + ['EXCESS/LOSS', 'DEBIT', 'DEBIT PAID', 'CREDIT', 'CREDIT PAID']))
          
          #Check if 'MOBILE BUNDLES and SHARES Details' exists and add it to the list of cols_to_right
          if 'MOBILE BUNDLES and SHARES Details' in self.df.columns:
@@ -1128,5 +1128,5 @@ class FinancialReport:
             plt.show()
             plt.close()
         else:
-            pass #Do nothing
+           pass #Do nothing
 

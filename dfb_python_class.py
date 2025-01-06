@@ -71,8 +71,19 @@ class FinancialReport:
     def _get_data_from_dropbox(self):
         url = self.file_url
         urllib.request.urlretrieve(url, self.file_name)
-        data = pd.read_csv(self.file_name)
-        return data
+        df = pd.read_csv(self.file_name)
+        
+        #Remove timezone information (everything after 'GMT+0300') from both columns
+        df['Timestamp'] = df['Timestamp'].str.replace(r'GMT[+-]\d{4}.*', '', regex=True).str.strip()
+        df['Date of Transaction'] = df['Date of Transaction'].str.replace(r'GMT[+-]\d{4}.*', '', regex=True).str.strip()
+
+        #Convert 'Timestamp' to MM/DD/YYYY HH:MM:SS format
+        df['Timestamp'] = pd.to_datetime(df['Timestamp'], format='%a %b %d %Y %H:%M:%S', dayfirst=False).dt.strftime('%m/%d/%Y %H:%M:%S')
+
+        #Convert 'Date of Transaction' to MM/DD/YYYY format
+        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%a %b %d %Y %H:%M:%S', dayfirst=False).dt.strftime('%m/%d/%Y')
+        
+        return df
         
     def _get_data_from_kobo(self):
         assets = self.kobo.list_assets()
@@ -896,11 +907,9 @@ class FinancialReport:
     def date_range_report(self, start_date, end_date, report_type):
         df = self.df.copy()
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
-        
         #Convert start_date and end_date strings to datetime objects
         start_date = pd.to_datetime(start_date, format='%d/%m/%Y')
         end_date = pd.to_datetime(end_date, format='%d/%m/%Y')
-
         #Filter rows based on the date range
         df = df[(df['Date of Transaction'] >= start_date) & (df['Date of Transaction'] <= end_date)]
 
@@ -912,7 +921,7 @@ class FinancialReport:
         df = self.calculations(df)
         df = df.map(self.format_data)  #Assuming format_data works element-wise or with .apply()
         df = self.date_time(df)
-
+        
         #Reports
         if report_type == 'brief':
             df = self.subset_df(df)
@@ -940,7 +949,6 @@ class FinancialReport:
         duplicate_count = 0
         if date is None:
             date = most_recent_date
-            #df_selected = df[df['Date of Transaction'] == most_recent_date].copy()  #Use most recent date if none provided
             df_selected_initial = df[df['Date of Transaction'] == most_recent_date].copy()  # Use most recent date if none provided
             #Filter for rows where 'Name of Submitter' has two strings separated by ';'
             df_selected = df_selected_initial[df_selected_initial['Name of Submitter'].str.contains(';', na=False)]

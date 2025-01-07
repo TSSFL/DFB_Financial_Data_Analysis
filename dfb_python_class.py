@@ -45,12 +45,6 @@ class FinancialReport:
         self.df = self._full_report()
 
     def _get_data_from_google_drive(self):
-        print(
-        "🌟 Welcome to TSSFL Technology Stack! 🚀\n"
-        "Embark on a journey of financial insights as we\n" 
-        "process your data with precision and elegance.\n"
-        "Please hold on while we craft your comprehensive report! 📊✨\n"
-        "")
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
         #Define the scope
         scope = ['https://www.googleapis.com/auth/spreadsheets'] 
@@ -69,6 +63,14 @@ class FinancialReport:
         return data
         
     def _get_data_from_dropbox(self):
+        print(
+        "🌟 Welcome to TSSFL Technology Stack! 🚀\n"
+        "Your financial data is being processed\n"
+        "with precision and speed. \n" 
+        "This process will only take a few seconds.\n"
+         "Please wait...📊✨\n"
+        "")
+        print("Fetching data...")
         url = self.file_url
         urllib.request.urlretrieve(url, self.file_name)
         df = pd.read_csv(self.file_name)
@@ -83,6 +85,7 @@ class FinancialReport:
         #Convert 'Date of Transaction' to MM/DD/YYYY format
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%a %b %d %Y %H:%M:%S', dayfirst=False).dt.strftime('%m/%d/%Y')
         
+        print("Data fetched successfully from source. \n")
         return df
         
     def _get_data_from_kobo(self):
@@ -97,7 +100,7 @@ class FinancialReport:
         self.df = pd.DataFrame(new_results) #Avoid self.df is referencing outside this methhod
         self.df_copy = self.df.copy() #Create a copy of the original dataframe
         return self.df
-        
+      
     def date_time(self, df):
         df['Date of Submission'] = pd.to_datetime(df['Date of Submission']).dt.strftime('%d/%m/%Y %H:%M:%S')
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction']).dt.strftime('%d/%m/%Y')
@@ -316,10 +319,10 @@ class FinancialReport:
                 df[col] = df[col].apply(lambda x: float(f"{x:.2f}"))
             except Exception as e:
                 print(f"Error processing column '{col}': {e}")
-    
+                
         #Return the cleaned DataFrame
         return df
-    def calculations(self, df):
+    def calculations(self, df): 
         df = df.copy()
         df = self.clean_numeric_columns(self.df)        
         #Sum columns
@@ -475,7 +478,7 @@ class FinancialReport:
                 reordered_cols.append(next(movable_iter))
 
         return df[reordered_cols]
-    
+             
     def _full_report(self, report_type = "default_report_type"):
          if self.data_source == 'google_drive':
             self.df = pd.DataFrame(self.data).copy()
@@ -599,7 +602,7 @@ class FinancialReport:
          if lipa_mobile_columns:  # Check if any columns match the criteria
              self.df['TOTAL LIPA MOBILE FLOAT'] = self.df[lipa_mobile_columns].sum(axis=1)
          else:
-             print("TOTAL LIPA MOBILE FLOA: No columns found")
+             print("TOTAL LIPA MOBILE FLOAT: No columns found")
        
          #TOTAL SELCOM FLOAT
          selcom_cols = [col for col in self.df.columns if "SELCOM" in col and all(kw not in col for kw in ["COMM", "TOTAL"])]
@@ -790,7 +793,7 @@ class FinancialReport:
             output_file = 'Full_DFB_Report.html'
 
          self.generate_html_table(df, output_file)
-    
+         
          return self.df
         
     #Slice a dataframe based on a month for all years - full report

@@ -59,7 +59,7 @@ class FinancialReport:
         return filtered_data
 
     def _get_data_from_local_drive(self):
-        data = pd.read_csv(self.file_path)  
+        data = pd.read_csv(self.file_path)
         return data
         
     def _get_data_from_dropbox(self):
@@ -397,11 +397,11 @@ class FinancialReport:
         df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Generated at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
 
         df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True,
-        even_color='darkblue', even_bg_color='#c3d9ff') #1240 px
+        even_color='darkblue', even_bg_color='#c3d9ff') #640 px
         style = """
         <style scoped>
         .dataframe-div {
-        max-height: 640px;
+        max-height: 900px;
         overflow: auto;
         position: relative;
         }
@@ -795,6 +795,60 @@ class FinancialReport:
          self.generate_html_table(df, output_file)
          
          return self.df
+    
+    #COMM Report - Month Year
+    def comm_report(self):
+        """
+        Generates a COMM report summarizing columns with 'COMM' in their names for each month and year.
+
+        Args:
+            self:  The class instance containing a Pandas DataFrame called self.df.
+        """
+        df = self.df
+
+        #Ensure 'Date of Transaction' is datetime
+        try:
+            df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%m/%d/%Y', errors='coerce')
+        except ValueError as e:
+            print(f"Error converting 'Date of Transaction' column: {e}. Check date format.")
+            return  #Exit if date conversion fails
+
+        #Identify COMM columns
+        comm_cols = [col for col in df.columns if 'COMM' in col]
+        if not comm_cols:
+            print("No columns found with 'COMM' in their name.")
+            return
+
+        #Group by month and year, sum COMM columns
+        df['MONTH YEAR'] = df['Date of Transaction'].dt.strftime('%B %Y')
+        df['Year'] = df['Date of Transaction'].dt.year
+        df['Month'] = df['Date of Transaction'].dt.month
+    
+        df = df.groupby(['Year', 'Month', 'MONTH YEAR'])[comm_cols].sum().reset_index()
+
+        #Sort chronologically
+        df = df.sort_values(by=['Year', 'Month'])
+        
+        #Delete columns
+        df = df.drop(['Year', 'Month'], axis=1)
+        
+        #Calculate totals, averages, etc.
+        cal = pd.DataFrame({
+        'TOTAL COMM': df.loc[:, df.columns != 'MONTH YEAR'].sum(),
+        'AVERAGE COMM': df.loc[:, df.columns != 'MONTH YEAR'].mean(),
+        'HIGHEST COMM': df.loc[:, df.columns != 'MONTH YEAR'].max(),
+        'LOWEST COMM': df.loc[:, df.columns != 'MONTH YEAR'].min()
+        }).T
+        
+        #Change the index to start with 1
+        df.index = np.arange(1, len(df) + 1)
+        
+        df = pd.concat([df, cal])
+        
+        df = df.map(self.format_data)
+        
+        output_file = 'COMM_Report.html'
+        self.generate_html_table(df, output_file)
         
     #Slice a dataframe based on a month for all years - full report
     def specific_month_for_all_years_report(self, month, report_type):
@@ -1140,4 +1194,3 @@ class FinancialReport:
             plt.close()
         else:
            pass #Do nothing
-

@@ -401,7 +401,7 @@ class FinancialReport:
         style = """
         <style scoped>
         .dataframe-div {
-        max-height: 900px;
+        max-height: 800px;
         overflow: auto;
         position: relative;
         }

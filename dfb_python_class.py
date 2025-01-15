@@ -804,7 +804,7 @@ class FinancialReport:
         Args:
             self:  The class instance containing a Pandas DataFrame called self.df.
         """
-        df = self.df
+        df = self.df.copy()
 
         #Ensure 'Date of Transaction' is datetime
         try:

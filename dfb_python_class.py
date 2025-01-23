@@ -394,51 +394,91 @@ class FinancialReport:
             return ""
         
     def generate_html_table(self, df, output_file):
-        df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Generated at TSSFL Technology Stack - www.tssfl.com on {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern AFrica Time")], df.columns])
-
-        df_html = build_table(df, 'green_light', font_size='large', font_family='Open Sans, sans-serif', text_align='left', width='auto', index=True,
-        even_color='darkblue', even_bg_color='#c3d9ff') #640 px
-        style = """
+        #Create custom CSS styles
+        css_styles = """
         <style scoped>
         .dataframe-div {
-        max-height: 800px;
-        overflow: auto;
-        position: relative;
-        }
-    
+            max-height: 800px; /* Limit height for scrolling */
+            overflow: auto; /* Enable scroll if content is too large */
+            position: relative;
+            }
+ 
         .dataframe thead th {
-        position: -webkit-sticky; /* for Safari */
-        position: sticky;
-        top: 0;
-        background: green;
-        color: darkblue;
-        }
-    
+             position: -webkit-sticky; /* Sticky header for webkit browsers */
+             position: sticky; /* Sticky header */
+             top: 0;
+             background: green; /*#4CAF50*/
+             color: darkblue; /*white*/
+             /*z-index: 2;*/
+             }
+ 
         .dataframe thead th:first-child {
-        left: 0;
-        z-index: 1;
-        }
-    
+            left: 0;
+            z-index: 1;
+            }
+ 
         .dataframe tbody tr th:only-of-type {
-           vertical-align: middle;
-        }
-    
+            vertical-align: middle;
+            }
+ 
         .dataframe tbody tr th {
-        position: -webkit-sticky; /* for Safari */
-        position: sticky;
-        left: 0;
-        background: blue;
-        color: green;
-        vertical-align: top;
-        }
-        </style>
-        """
-        df_html = style + '<div class="dataframe-div">' + df_html + "\n</div>"
-        
-        with open(output_file, "w+") as file:
-            file.write(df_html)
-            
-        return df_html
+            position: -webkit-sticky; /* for Safari */
+            position: sticky;
+            left: 0;
+            background: blue; /*white*/
+            color: green;
+            vertical-align: top;
+            /*z-index: 1;*/
+            }
+ 
+        /*Additional styles*/
+ 
+        .dataframe table {
+            width: 100%; /* Make table take full available width */
+            table-layout: fixed; /* Required for column width control */
+            border-collapse: collapse; /* Ensure proper table borders */
+            }
+    
+         /*.dataframe th,*/
+         
+         .dataframe td {
+            /*overflow: hidden;   Hide text that overflows the cell */
+            /*text-overflow: ellipsis;  Add ellipsis for overflow */
+            white-space: nowrap; /*Prevent text wrapping */
+            /*max-width: 100ch; Ensure the cell width does not exceed 100 characters */
+            line-height: 2.0rem;
+            padding: 8px;
+            border: 1px solid #ddd;
+            }
+ 
+        /*.dataframe th {
+            background-color: #f2f2f2;
+            }*/
+         """
+        css_styles += "</style>"
+ 
+        df.columns = pd.MultiIndex.from_product([[(f"Automated Daily UWAKALA Business Financial Reports Generated at TSSFL Technology Stack - www.tssfl.com on  {pd.Timestamp.now(tz='Africa/Nairobi').strftime('%d-%m-%Y %H:%M:%S')} Estern Africa Time")], df.columns])
+ 
+        #Build the HTML table using pretty_html_table
+        df_html = build_table(
+        df,
+        'green_light',
+        font_size='medium',
+        font_family='Open Sans, sans-serif',
+        text_align='left', width = 'auto',
+        index=True,
+        even_color='darkblue',
+        even_bg_color='#c3d9ff',
+        )
+ 
+        #Combine CSS styles with the HTML table
+        final_html = css_styles + '<div class="dataframe-div">' + df_html + "</div>"
+ 
+        #Write the final HTML to a file
+        with open(output_file, "w", encoding="utf-8") as file:
+            file.write(final_html)
+     
+        return final_html
     
     def mini_report(self, df):
         mini_df = df[['Date of Transaction'] + list(df.loc[:, 'ACTUAL OPERATING CAPITAL':'DEBIT PAID'].columns)]
@@ -840,12 +880,12 @@ class FinancialReport:
         'LOWEST COMM': df.loc[:, df.columns != 'MONTH YEAR'].min()
         }).T
         
-        #Change the index to start with 1
-        df.index = np.arange(1, len(df) + 1)
-        
         df = pd.concat([df, cal])
         
         df = df.map(self.format_data)
+        
+        #Change the index to start with 1
+        df.index = np.arange(1, len(df) + 1)
         
         output_file = 'COMM_Report.html'
         self.generate_html_table(df, output_file)
@@ -1194,3 +1234,4 @@ class FinancialReport:
             plt.close()
         else:
            pass #Do nothing
+

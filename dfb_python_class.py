@@ -437,7 +437,7 @@ class FinancialReport:
             width: 100%; /* Make table take full available width */
             table-layout: fixed; /* Required for column width control */
             border-collapse: collapse; /* Ensure proper table borders */
-            font-size: 2.0rem; /*Base font size. Adjust as needed. */
+            /*font-size: 2.0rem; Base font size. Adjust as needed. */
             }
     
          /*.dataframe th,*/
@@ -461,15 +461,15 @@ class FinancialReport:
          /* Media query for smaller screens */
          @media screen and (max-width: 767px) {
          .dataframe table {
-             width: 100%; / Ensures table takes full width /
-             border-collapse: collapse; / Improves visual clarity */
-             font-size: 2.0rem !important; /*Increased font size for mobile */
+             width: 100%; /* Ensures table takes full width */
+             border-collapse: collapse; /* Improves visual clarity */
+             font-size: 2.5rem !important; /*Increased font size for mobile */
              }
          .dataframe th,
          .dataframe td {
           /* Consider further adjustments for smaller screens, e.g., smaller padding */
-              padding: 2px; / Adds padding for better spacing /
-              border: 1px solid #ccc; / Adds subtle borders for clarity */
+              padding: 2px; /* Adds padding for better spacing */
+              border: 1px solid #ccc; /* Adds subtle borders for clarity */
               }
           }
          """
@@ -481,7 +481,7 @@ class FinancialReport:
         df_html = build_table(
         df,
         'green_light',
-        #font_size='large',
+        font_size='large',
         font_family='Open Sans, sans-serif',
         text_align='left', width = 'auto',
         index=True,

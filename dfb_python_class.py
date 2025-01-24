@@ -437,7 +437,7 @@ class FinancialReport:
             width: 100%; /* Make table take full available width */
             table-layout: fixed; /* Required for column width control */
             border-collapse: collapse; /* Ensure proper table borders */
-            /*font-size: 2.0rem; Base font size. Adjust as needed. */
+            font-size: 2.0rem; /*Base font size. Adjust as needed. */
             }
     
          /*.dataframe th,*/
@@ -463,7 +463,7 @@ class FinancialReport:
          .dataframe table {
              width: 100%; / Ensures table takes full width /
              border-collapse: collapse; / Improves visual clarity */
-             /*font-size: 2.0rem !important; Increased font size for mobile */
+             font-size: 2.0rem !important; /*Increased font size for mobile */
              }
          .dataframe th,
          .dataframe td {
@@ -481,7 +481,7 @@ class FinancialReport:
         df_html = build_table(
         df,
         'green_light',
-        font_size='large',
+        #font_size='large',
         font_family='Open Sans, sans-serif',
         text_align='left', width = 'auto',
         index=True,

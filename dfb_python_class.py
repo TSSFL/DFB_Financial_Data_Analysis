@@ -463,7 +463,7 @@ class FinancialReport:
          .dataframe table {
              width: 100%; / Ensures table takes full width /
              border-collapse: collapse; / Improves visual clarity */
-             font-size: 2.0rem !important; /* Increased font size for mobile */
+             font-size: 4.0rem !important; /* Increased font size for mobile */
              }
          .dataframe th,
          .dataframe td {

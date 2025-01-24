@@ -470,6 +470,7 @@ class FinancialReport:
           /* Consider further adjustments for smaller screens, e.g., smaller padding */
               padding: 2px; /* Adds padding for better spacing */
               border: 1px solid #ccc; /* Adds subtle borders for clarity */
+              line-height: 2.0rem;
               }
           }
          """

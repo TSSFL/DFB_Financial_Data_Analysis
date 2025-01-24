@@ -463,7 +463,7 @@ class FinancialReport:
          .dataframe table {
              width: 100%; /* Ensures table takes full width */
              border-collapse: collapse; /* Improves visual clarity */
-             font-size: 2.5rem !important; /*Increased font size for mobile */
+             font-size: 2.0rem !important; /*Increased font size for mobile */
              }
          .dataframe th,
          .dataframe td {
@@ -898,12 +898,12 @@ class FinancialReport:
         'LOWEST COMM': df.loc[:, df.columns != 'MONTH YEAR'].min()
         }).T
         
-        df = pd.concat([df, cal])
-        
-        df = df.map(self.format_data)
-        
         #Change the index to start with 1
         df.index = np.arange(1, len(df) + 1)
+        
+        df = pd.concat([df, cal])
+        print(df)
+        df = df.map(self.format_data)
         
         output_file = 'COMM_Report.html'
         self.generate_html_table(df, output_file)

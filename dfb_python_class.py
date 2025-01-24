@@ -454,6 +454,14 @@ class FinancialReport:
         /*.dataframe th {
             background-color: #f2f2f2;
             }*/
+            
+         @media screen and (max-width: 767px) {
+         .dataframe table {
+         /* Targets the main table /
+         font-size: 16px !important; / Increased font size /
+         width: 100%; / Ensures table takes full width /
+         border-collapse: collapse; / Improves visual clarity */
+         }   
          """
         css_styles += "</style>"
  
@@ -1234,4 +1242,3 @@ class FinancialReport:
             plt.close()
         else:
            pass #Do nothing
-

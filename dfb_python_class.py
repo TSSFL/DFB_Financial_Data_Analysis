@@ -409,7 +409,7 @@ class FinancialReport:
              top: 0;
              background: green; /*#4CAF50*/
              color: darkblue; /*white*/
-             /*z-index: 2;*/
+             z-index: 1;
              }
  
         .dataframe thead th:first-child {
@@ -428,7 +428,7 @@ class FinancialReport:
             background: blue; /*white*/
             color: green;
             vertical-align: top;
-            /*z-index: 1;*/
+            z-index: 1;
             }
  
         /*Additional styles*/
@@ -437,6 +437,7 @@ class FinancialReport:
             width: 100%; /* Make table take full available width */
             table-layout: fixed; /* Required for column width control */
             border-collapse: collapse; /* Ensure proper table borders */
+            /*font-size: 2.0rem; Base font size. Adjust as needed. */
             }
     
          /*.dataframe th,*/
@@ -449,19 +450,28 @@ class FinancialReport:
             line-height: 2.0rem;
             padding: 8px;
             border: 1px solid #ddd;
+            overflow-x: auto; /* Allow horizontal scrolling within cells if needed */
+            box-sizing: border-box; /* Ensures padding and border are included in cell width */
             }
  
         /*.dataframe th {
             background-color: #f2f2f2;
             }*/
             
+         /* Media query for smaller screens */
          @media screen and (max-width: 767px) {
          .dataframe table {
-         /* Targets the main table /
-         font-size: 16px !important; / Increased font size /
-         width: 100%; / Ensures table takes full width /
-         border-collapse: collapse; / Improves visual clarity */
-         }   
+             width: 100%; / Ensures table takes full width /
+             border-collapse: collapse; / Improves visual clarity */
+             font-size: 2.0rem !important; /* Increased font size for mobile */
+             }
+         .dataframe th,
+         .dataframe td {
+          /* Consider further adjustments for smaller screens, e.g., smaller padding */
+              padding: 2px; / Adds padding for better spacing /
+              border: 1px solid #ccc; / Adds subtle borders for clarity */
+              }
+          }
          """
         css_styles += "</style>"
  
@@ -471,7 +481,7 @@ class FinancialReport:
         df_html = build_table(
         df,
         'green_light',
-        font_size='medium',
+        font_size='large',
         font_family='Open Sans, sans-serif',
         text_align='left', width = 'auto',
         index=True,

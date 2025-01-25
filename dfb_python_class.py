@@ -175,18 +175,20 @@ class FinancialReport:
                         strings = [s for s in group[col].astype(str) if s.strip()]  #added strip() to remove spaces and make it efficient
                         new_row[col] = '; '.join(strings) if strings else None  #Handle empty list case
                     elif col == 'Name of Submitter':
+                    
                         #Extract first names and concatenate with ';'
                         names = [str(s).split()[0] for s in group[col] if str(s).strip()] # Check for empty or only space strings
                         new_row[col] = '; '.join(names) if names else None  #Handle empty list case
-
+            
+                        
                     elif col == 'Timestamp':
                         #Get date and most recent time 
                         dates = pd.to_datetime(group['Timestamp'], errors='coerce')  #handle invalid Timestamps
                         if not dates.empty: #Added to check for NaT values due to invalid timestamp formats
                             most_recent_datetime = dates.max()
-                            #first_row[col] = group[col].iloc[-1].strftime('%m/%d/%Y %H:%M:%S') #Take the last time -1, first time - 0
                             new_row[col] = most_recent_datetime.strftime('%m/%d/%Y %H:%M:%S') if not pd.isnull(most_recent_datetime) else None  #added isnull check
                             print(new_row[col])
+                        
                     elif pd.api.types.is_numeric_dtype(df[col]):
                         #Sum numeric columns
                         new_row[col] = group[col].sum()
@@ -199,15 +201,27 @@ class FinancialReport:
         #Create a new DataFrame from the consolidated rows
         df_new = pd.DataFrame(new_rows)
         
+        #Update the index of the new DataFrame to match the original DataFrame
+        
         #Concatenate the original DataFrame and the new DataFrame
         df_result = pd.concat([df, df_new], ignore_index=True)
-        
+
         #Sort the resulting DataFrame by 'Date of Transaction' if needed
         df_result = df_result.sort_values(by='Date of Transaction', na_position='first').reset_index(drop=True)
+        
+        #Custom Sorting: Place rows with semicolon-separated names last within each Date of Transaction
+        def custom_sort(group):
+            #Sort rows: Place rows with ';' in 'Name of Submitter' last
+            group['semicolon_flag'] = group['Name of Submitter'].apply(lambda x: ';' in str(x))
+            group = group.sort_values(by='semicolon_flag', ascending=True).drop(columns=['semicolon_flag'])
+            return group
+
+        #Apply the custom sort for each group of rows with the same 'Date of Transaction'
+        df_result = df_result.groupby('Date of Transaction', group_keys=False).apply(custom_sort)
 
         return df_result
     
-    def consolidate_transactions(self, df):
+    def consolidate_transactions(self, df): #Consolidates string values 
         #Convert 'Date of Transaction' and 'Timestamp' to datetime objects
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'])
         df['Timestamp'] = pd.to_datetime(df['Timestamp'])
@@ -225,7 +239,6 @@ class FinancialReport:
                     non_empty_strings = [s for s in group[col].astype(str) if s.strip()] #ignore empty strings
                     first_row[col] = '; '.join(non_empty_strings) if non_empty_strings else '' #Avoid ; when the list is empty or has empty string
                 elif col == 'Name of Submitter':
-                    #first_row[col] = '; '.join(group[col].str.split().str[0].dropna())
                     first_row[col] = '; '.join(group[col].str.split().str[0].map(str).dropna()) #Map to string type to handle mixed types correctly
                 elif col == 'Timestamp':
                    first_row[col] = group[col].iloc[-1].strftime('%m/%d/%Y %H:%M:%S') #Take the last time -1, first time - 0

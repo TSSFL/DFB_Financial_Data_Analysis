@@ -411,7 +411,7 @@ class FinancialReport:
         css_styles = """
         <style scoped>
         .dataframe-div {
-            max-height: 800px; /* Limit height for scrolling */
+            max-height: 750px; /* Limit height for scrolling */
             overflow: auto; /* Enable scroll if content is too large */
             position: relative;
             }

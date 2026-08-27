@@ -1768,7 +1768,7 @@ class FinancialReport:
            because border-collapse is separate, so they stay put while it is sticky. */
         table.ngc thead th { position:sticky; top:0; z-index:20;
             background:#ffffff; color:#0B2A5B; padding:14px 13px;
-            border-bottom:2px solid %(gold)s; border-right:1px solid #e3e9f1;
+            border-bottom:2px solid %(gold)s; border-right:1px solid #b7c7da;
             white-space:normal; word-wrap:break-word; overflow-wrap:anywhere;
             min-width:138px; max-width:210px; vertical-align:middle;
             text-align:center; line-height:1.32; font-weight:700;
@@ -1776,10 +1776,14 @@ class FinancialReport:
         table.ngc thead th:first-child { left:0; z-index:30; background:#fff; }
 
         /* Body: dark ink throughout, pale alternating grounds. */
-        table.ngc tbody td { padding:11px 14px; border-bottom:1px solid #e6ebf2;
-            border-right:1px solid #eef2f7; text-align:right; white-space:nowrap;
-            line-height:1.5; color:#16243a; background:#ffffff; }
-        table.ngc tbody tr:nth-child(even) td { background:#e9f0fa; color:#123055; }
+        /* Ink is a near-black navy at semibold: on Liberation Sans / Arial weight
+           600 maps to the Bold face, so figures read sharply on both grounds.
+           The column rule is a definite blue-grey - the old #eef2f7 was invisible
+           against white and pale blue alike. */
+        table.ngc tbody td { padding:11px 14px; border-bottom:1px solid #d3ddea;
+            border-right:1px solid #b7c7da; text-align:right; white-space:nowrap;
+            line-height:1.5; color:#0b1c33; font-weight:600; background:#ffffff; }
+        table.ngc tbody tr:nth-child(even) td { background:#e9f0fa; }
 
         /* Sticky index column: pale gold so it separates from the data without
            inverting to white ink. */
@@ -1792,12 +1796,12 @@ class FinancialReport:
         /* Hover only deepens the ground - the ink stays dark, so nothing can
            disappear. (The old rule repainted the navy index cell in a pale tint
            and left its white text invisible.) */
-        table.ngc tbody tr:hover td { background:#dce8f7; color:#0B2A5B; }
+        table.ngc tbody tr:hover td { background:#d6e4f6; color:#08182c; }
         table.ngc tbody tr:hover td:first-child { background:#f7dfa4; color:#0B2A5B; }
 
         /* Summary block reads as a footer, not as more data. */
         table.ngc tbody tr:nth-last-child(-n+4) td { background:#dfe8f4;
-            font-weight:700; color:#0B2A5B; border-top:1px solid #c6d5e8; }
+            font-weight:700; color:#08182c; border-top:2px solid #9fb4cd; }
         table.ngc tbody tr:nth-last-child(-n+4) td:first-child { background:#f4e3b4; }
         table.ngc tbody tr:nth-last-child(-n+4):hover td { background:#d2e0f2; }
         table.ngc tbody tr:nth-last-child(-n+4):hover td:first-child { background:#f7dfa4; }

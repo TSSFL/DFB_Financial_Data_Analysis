@@ -1752,9 +1752,11 @@ class FinancialReport:
                          overflow:hidden; background:#fff;
                          box-shadow:0 10px 34px rgba(11,42,91,.20); }
         .ngc-band { display:flex; width:100%%; }
+        /* Each band is closed by a thin gold rule: brand colours on top, navy
+           body, gold at the lower boundary - header and footer mirror each other. */
         .ngc-head { background:%(navy)s; color:#fff; padding:20px 28px; text-align:center;
                     font-size:1.2rem; font-weight:700; letter-spacing:.15px;
-                    word-wrap:break-word; }
+                    word-wrap:break-word; border-bottom:3px solid %(gold)s; }
         .ngc-head .ngc-sub { display:block; margin-top:7px; font-weight:400;
                              font-size:.92rem; color:#c7d4e6; letter-spacing:.2px; }
         .ngc-head .ngc-co { color:%(gold)s; font-weight:600; }
@@ -1812,7 +1814,8 @@ class FinancialReport:
             text-align:left; min-width:174px; }
 
         .ngc-foot { background:%(deep)s; color:#c7d4e6; padding:18px 26px;
-                    text-align:center; font-size:.88rem; line-height:1.6; }
+                    text-align:center; font-size:.88rem; line-height:1.6;
+                    border-bottom:3px solid %(gold)s; }
         .ngc-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
 
         @media screen and (max-width:767px) {
@@ -1899,12 +1902,12 @@ class FinancialReport:
         for i, col in enumerate(fdf.columns, start=1):
             if 'Details' in col or 'INCIDENTS' in col:
                 detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
-                               "{min-width:320px !important;max-width:520px !important;"
+                               "{min-width:400px !important;max-width:650px !important;"
                                "white-space:normal !important;word-wrap:break-word !important;"
                                "text-align:left !important;line-height:1.35 !important;}\n" % (i, i))
             elif 'Name of Submitter' in col:
                 detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
-                               "{min-width:200px !important;max-width:320px !important;"
+                               "{min-width:250px !important;max-width:400px !important;"
                                "white-space:normal !important;word-wrap:break-word !important;"
                                "text-align:left !important;line-height:1.2 !important;}\n" % (i, i))
 
@@ -1931,6 +1934,7 @@ class FinancialReport:
                 "<div class='ngc-band'>{band}</div>"
                 "<div class='ngc-head'>{head}</div>"
                 "<div class='dataframe-div'>{table}</div>"
+                "<div class='ngc-band'>{band}</div>"
                 "<div class='ngc-foot'>{foot}</div>"
                 "</div></body></html>").format(css=css, detail=detail_css, band=band,
                                                head=head, table=df_html, foot=foot)

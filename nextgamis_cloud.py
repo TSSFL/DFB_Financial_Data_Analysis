@@ -30,7 +30,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class FinancialReport:
-    def __init__(self, data_source, spreadsheet_id =None, service_account_file=None, range_name=None, file_path=None, file_name=None, token=None, url=None, asset_index=None):
+    def __init__(self, data_source, spreadsheet_id =None, service_account_file=None, range_name=None, file_path=None, file_name=None, token=None, url=None, asset_index=None, prepare=True):
         self.data_source = data_source
         if self.data_source == 'google_drive':
             self.spreadsheet_id = spreadsheet_id #Using spreadsheet id instead of key
@@ -56,7 +56,14 @@ class FinancialReport:
         #Untouched source frame, used by the NEXTGAMIS ABS parity reports
         self.raw_df = (self.df if self.data_source == 'kobo' else self.data).copy()
 
-        self.df = self._full_report()
+        #Prepare the legacy frame but do NOT render: _full_report's HTML pass costs
+        #~10s and writes a ~9MB Full_DFB_Report.html that nobody asked for, on every
+        #instantiation. The legacy endpoints call _full_report('comp') etc. explicitly
+        #when they want output. prepare=False skips this entirely - use it when only
+        #the ABS parity reports (abs_report / daily_snapshot_report / quick_report)
+        #are needed, since those read self.raw_df and never touch self.df.
+        if prepare:
+            self.df = self._full_report(render=False)
 
     def _get_data_from_google_drive(self):
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
@@ -566,7 +573,7 @@ class FinancialReport:
 
         return df[reordered_cols]
              
-    def _full_report(self, report_type = "default_report_type"):
+    def _full_report(self, report_type = "default_report_type", render=True):
          if self.data_source == 'google_drive':
             self.df = pd.DataFrame(self.data).copy()
          elif self.data_source == 'local_drive' or self.data_source == 'dropbox':
@@ -879,7 +886,11 @@ class FinancialReport:
          else:
             output_file = 'Full_DFB_Report.html'
 
-         self.generate_html_table(df, output_file)
+         #Rendering is the expensive half - build_table writes an inline style= on
+         #every cell (~58,000 for a full dataset): ~10s and ~9MB. Callers that only
+         #need the calculated frame pass render=False.
+         if render:
+             self.generate_html_table(df, output_file)
          
          return self.df
     

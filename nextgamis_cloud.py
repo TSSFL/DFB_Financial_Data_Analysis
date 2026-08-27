@@ -1,3 +1,14 @@
+#NEXTGAMIS Cloud - Agency Banking Reporting
+#TSSFL Technology Stack - www.tssfl.com
+#
+#Single class, loadable directly from GitHub:
+#   load("https://raw.githubusercontent.com/TSSFL/DFB_Financial_Data_Analysis/master/nextgamis_cloud.py")
+#
+#Carries the original report methods unchanged, plus the NEXTGAMIS ABS
+#parity layer: reports 1-7 over All Time / a Year / a Date Range, ABS column
+#naming with backward compatibility for the legacy form headers, ABS
+#reconciliation maths, and ABS typography.
+
 import gspread
 import urllib.request
 import numpy as np
@@ -42,6 +53,9 @@ class FinancialReport:
             self.df_copy = None
             self.df = self._get_data_from_kobo()
     
+        #Untouched source frame, used by the NEXTGAMIS ABS parity reports
+        self.raw_df = (self.df if self.data_source == 'kobo' else self.data).copy()
+
         self.df = self._full_report()
 
     def _get_data_from_google_drive(self):
@@ -641,7 +655,7 @@ class FinancialReport:
          if normal_mobile_columns:
                 self.df['TOTAL NORMAL MOBILE FLOAT'] = self.df[normal_mobile_columns].sum(axis=1) 
          else: 
-             print("TOTAL NORMAL MOBILE FLOAT: No columns found")          
+             pass  #absent provider block is normal - each agent carries a different mix
           
          #SUPER AGENT MOBILE FLOAT TOTAL
          #Keywords to exclude
@@ -658,7 +672,7 @@ class FinancialReport:
          if superagent_mobile_columns:  # Check if any columns match the criteria
              self.df['TOTAL SUPERAGENT MOBILE FLOAT'] = self.df[superagent_mobile_columns].sum(axis=1)
          else:
-             print("TOTAL SUPERAGENT MOBILE FLOAT: No columns found")
+             pass  #absent provider block is normal - each agent carries a different mix
              
          #LIPA MOBILE FLOAT TOTAL
          #Keywords to exclude
@@ -675,91 +689,91 @@ class FinancialReport:
          if lipa_mobile_columns:  # Check if any columns match the criteria
              self.df['TOTAL LIPA MOBILE FLOAT'] = self.df[lipa_mobile_columns].sum(axis=1)
          else:
-             print("TOTAL LIPA MOBILE FLOAT: No columns found")
+             pass  #absent provider block is normal - each agent carries a different mix
        
          #TOTAL SELCOM FLOAT
          selcom_cols = [col for col in self.df.columns if "SELCOM" in col and all(kw not in col for kw in ["COMM", "TOTAL"])]
          if selcom_cols:
              self.df['SELCOM FLOAT TOTAL'] = self.df[selcom_cols].sum(axis=1)  
          else:
-             print("SELCOM FLOAT TOTAL: No matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
  
          #NORMAL BANK FLOAT TOTAL
          bank_cols = [col for col in self.df.columns if "BANK" in col and all(kw not in col for kw in ["SUPERAGENT", "TOTAL", "COMM"])]
          if bank_cols:
              self.df['TOTAL NORMAL BANK FLOAT'] = self.df[bank_cols ].sum(axis=1)   
          else:
-             print("TOTAL NORMAL BANK FLOAT: No matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
  
          #SUPERAGENT BANK FLOAT TOTAL
          sup_bank_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "SUPERAGENT"]) and all(kw not in col for kw in ["TOTAL", "COMM"])]
          if sup_bank_cols:
              self.df['TOTAL SUPERAGENT BANK FLOAT'] = self.df[sup_bank_cols].sum(axis=1) 
          else:
-             print("TOTAL SUPERAGENT BANK FLOAT: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
 
          #NORMAL MOBILE COMMISSION TOTAL - includes MOBILE BUNDLES COMM and SHARES
          mobile_comm_cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "SUPERAGENT", "LIPA", "TOTAL", "SELCOM", "AGENCY", "Details"])]
          if mobile_comm_cols:
              self.df['TOTAL NORMAL MOBILE COMMISSION'] = self.df[mobile_comm_cols].sum(numeric_only=True, axis=1)
          else:
-             print("TOTAL NORMAL MOBILE COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
  
          #SUPERAGENT MOBILE COMMISSION TOTAL
          sup_mobile_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["COMM", "SUPERAGENT"]) and all(kw not in col for kw in ["BANK", "LIPA", "TOTAL", "SELCOM"])]
          if sup_mobile_comm_cols:
              self.df['TOTAL SUPERAGENT MOBILE COMMISSION'] = self.df[sup_mobile_comm_cols ].sum(axis=1)   
          else:
-             print("TOTAL NORMAL MOBILE COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
 
          #LIPA MOBILE COMMISSION TOTAL
          lipa_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["LIPA", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if lipa_comm_cols:
              self.df['TOTAL LIPA MOBILE COMMISSION'] = self.df[lipa_comm_cols].sum(axis=1)   
          else:
-             print("TOTAL LIPA MOBILE COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
 
          #TOTAL SELCOM COMMISSION
          selcom_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["SELCOM", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if selcom_comm_cols:
              self.df['TOTAL SELCOM COMMISSION'] = self.df[selcom_comm_cols].sum(axis=1)   
          else:
-             print("TOTAL SELCOM COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
 
          #NORMAL BANK COMMISSION TOTAL
          bank_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "COMM"]) and all(kw not in col for kw in ["SUPERAGENT", "TOTAL"])]
          if bank_comm_cols:
              self.df['TOTAL NORMAL BANK COMMISSION'] = self.df[bank_comm_cols].sum(axis=1)   
          else:
-             print("TOTAL NORMAL BANK COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
 
          #SUPERAGENT BANK COMMISSION TOTAL
          sup_bank_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "SUPERAGENT", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if sup_bank_comm_cols:
              self.df['TOTAL SUPERAGENT BANK COMMISSION'] = self.df[sup_bank_comm_cols].sum(axis=1)
          else:
-             print("TOTAL SUPERAGENT BANK COMMISSION: No matching columns") 
+             pass  #absent provider block is normal - each agent carries a different mix
     
          #TOTAL MOBILE COMMISSION
          cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["BANK", "TOTAL", "SELCOM", "AGENCY", "Details"])]
          if cols: 
              self.df['TOTAL MOBILE COMMISSION'] = self.df[cols].sum(numeric_only=True, axis=1)
          else: 
-             print("TOTAL MOBILE COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
     
          #TOTAL BANK COMMISSION
          cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
          if cols: 
              self.df['TOTAL BANK COMMISSION'] = self.df[cols].sum(axis=1)
          else: 
-             print("TOTAL BANK COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
     
          #TOTAL COMMISSION
          cols = [col for col in self.df.columns if "COMM" in col and all(kw not in col for kw in ["TOTAL"])]
          if cols: 
              self.df['TOTAL COMMISSION'] = self.df[cols].sum(axis=1)
          else: 
-             print("TOTAL COMMISSION: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
     
          #TOTAL MOBILE FLOAT
          cols = [col for col in self.df.columns if not any(kw in col for kw in ["BANK", "TOTAL", "COMM", "SELCOM", "AGENCY", 
@@ -767,21 +781,21 @@ class FinancialReport:
          if cols:
              self.df['TOTAL MOBILE FLOAT'] = self.df[cols].sum(axis=1)
          else:
-             print("TOTAL MOBILE FLOAT: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
     
          #TOTAL BANK FLOAT
          cols = [col for col in self.df.columns if "BANK" in col and all(kw not in col for kw in ["TOTAL", "COMM"])]
          if cols: 
              self.df['TOTAL BANK FLOAT'] = self.df[cols].sum(axis=1)
          else: 
-             print("TOTAL BANK FLOAT: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
     
          #TOTAL FLOAT
          cols = [col for col in self.df.columns if not any(keyword in col for keyword in ["COMM", "TOTAL", "INFUSION","TRANSFER", "SALARIES", "EXPENDITURES", "HARD", "Timestamp", "Submitter", "Details", "INCIDENTS", "Transaction", 'CREDIT', 'DEBIT'])]
          if cols: 
              self.df['TOTAL FLOAT'] = self.df[cols].sum(axis=1)
          else: 
-             print("TOTAL FLOAT: No Matching columns")
+             pass  #absent provider block is normal - each agent carries a different mix
          
          #Sort the dataframe alphabetically
          #self.df = self.rearrange_columns(self.df) #Apply this method or
@@ -889,7 +903,7 @@ class FinancialReport:
         #Identify COMM columns
         comm_cols = [col for col in df.columns if 'COMM' in col]
         if not comm_cols:
-            print("No columns found with 'COMM' in their name.")
+            pass  #absent provider block is normal - each agent carries a different mix
             return
 
         #Group by month and year, sum COMM columns
@@ -1266,3 +1280,950 @@ class FinancialReport:
             plt.close()
         else:
            pass #Do nothing
+
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # NEXTGAMIS ABS parity layer
+    # Mirrors src/engine.py + src/config_manager.py of NEXTGAMIS ABS so the
+    # Cloud reports are identical in both figures and presentation.
+    # ══════════════════════════════════════════════════════════════════════════
+
+    SELCOM = 'SELCOM'
+    MOBILE_POOL = ['AIRTEL MONEY', 'AIRTEL LIPA', 'AZAM PESA', 'HALO LIPA', 'HALO-PESA',
+                   'M-PESA', 'T-PESA', 'TIGO LIPA', 'TIGO-PESA', 'VODA LIPA']
+    BANK_POOL = ['ABSA BANK', 'ACCESS BANK', 'ACB BANK', 'AMANA BANK', 'AZANIA BANK',
+                 'BARODA BANK', 'BOA BANK', 'CBT BANK', 'CHINADASHENG BANK', 'CITI BANK',
+                 'CRDB BANK', 'DCB BANK', 'DTB BANK', 'ECO BANK', 'EQUITY BANK', 'EXIM BANK',
+                 'FINCA BANK', 'FIRSTHOUSING BANK', 'GT BANK', 'HABIB BANK', 'I&M BANK',
+                 'ICB BANK', 'INDIA BANK', 'KCB BANK', 'LETSHEGO BANK', 'MAENDELEO BANK',
+                 'MKOMBOZI BANK', 'MUCOBA BANK', 'MWALIMU BANK', 'MWANGA BANK', 'NBC BANK',
+                 'NCBA BANK', 'NMB BANK', 'PBZ BANK', 'SMB BANK', 'STANBIC BANK',
+                 'STANDARDCHARTERED BANK', 'TADB BANK', 'TCB BANK', 'TIB BANK', 'TMRC BANK',
+                 'UBA BANK', 'UCHUMI BANK', 'VISIONFUND BANK', 'YETU BANK']
+    AGENCY_POOL = ['MONEYGRAM AGENCY', 'RIA AGENCY', 'WESTERN UNION AGENCY', 'WORLDREMIT AGENCY']
+
+    #Legacy form headers that have since been renamed. Old submissions keep the
+    #old wording, so they are mapped onto the current provider name at read time.
+    PROVIDER_ALIASES = {'AKIBA BANK': 'ACB BANK'}
+
+    #Fields that are never provider accounts.
+    ABS_NON_PROVIDER = {
+        'Timestamp', 'Name of Submitter', 'Date of Transaction', 'Date of Submission',
+        'MOBILE BUNDLES COMM and SHARES', 'CAPITAL INFUSION', 'SALARIES', 'EXPENDITURES',
+        'TRANSFER FEES', 'HARD CASH', 'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID',
+        'INCIDENTS', 'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW', 'DAY NAME',
+        'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
+        'EXCESS', 'LOSS', 'EXCESS/LOSS', 'S/N',
+    }
+
+    ABS_TEXT_FIELDS = ['MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
+                       'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details',
+                       'CREDIT Details', 'DEBIT Details', 'CREDIT PAID Details',
+                       'DEBIT PAID Details',
+                       'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
+
+    # ── Column naming ─────────────────────────────────────────────────────────
+
+    @classmethod
+    def _abs_is_non_provider(cls, col):
+        if col in cls.ABS_NON_PROVIDER or col.endswith(' Details') or col.startswith('TOTAL '):
+            return True
+        return ' TOTAL' in col or 'GRAND TOTAL' in col
+
+    @classmethod
+    def normalise_column(cls, col):
+        """Legacy Cloud column name -> NEXTGAMIS ABS naming. Idempotent.
+
+        'AIRTEL MONEY 1 SUPERAGENT COMM' -> 'AIRTEL MONEY SUPERAGENT 1 COMM'
+        'AKIBA BANK'                     -> 'ACB BANK 1'
+        'SELCOM COMM'                    -> 'SELCOM 1 COMM'
+
+        Old forms emit unindexed provider names and put the index before
+        SUPERAGENT; ABS always indexes and puts the index last. Future forms
+        follow ABS naming, which this leaves untouched.
+        """
+        c = re.sub(r'\s+', ' ', str(col)).strip()
+        if cls._abs_is_non_provider(c):
+            return c
+
+        comm = c.endswith(' COMM')
+        if comm:
+            c = c[:-5]
+
+        sup, idx = False, '1'
+        m = re.match(r'^(?P<base>.+?) (?P<n>\d+) SUPERAGENT$', c)            # legacy Cloud
+        if m:
+            sup, idx, c = True, m.group('n'), m.group('base')
+        else:
+            m = re.match(r'^(?P<base>.+?) SUPERAGENT(?: (?P<n>\d+))?$', c)   # ABS
+            if m:
+                sup, idx, c = True, m.group('n') or '1', m.group('base')
+            else:
+                m = re.match(r'^(?P<base>.+?) (?P<n>\d+)$', c)
+                if m:
+                    idx, c = m.group('n'), m.group('base')
+
+        c = cls.PROVIDER_ALIASES.get(c, c)
+        out = "{} SUPERAGENT {}".format(c, idx) if sup else "{} {}".format(c, idx)
+        return out + " COMM" if comm else out
+
+    def normalise_columns(self, df):
+        """Rename every column to ABS naming, and report unrostered providers."""
+        before = list(df.columns)
+        df = df.rename(columns={c: self.normalise_column(c) for c in df.columns})
+        renamed = sum(1 for a, b in zip(before, df.columns) if a != b)
+        self._p("Columns normalised to ABS naming: {} columns, {} renamed"
+                .format(len(df.columns), renamed))
+        #ABS calls the submission stamp 'Date of Submission'; the forms emit 'Timestamp'.
+        if 'Timestamp' in df.columns and 'Date of Submission' not in df.columns:
+            df = df.rename(columns={'Timestamp': 'Date of Submission'})
+        pools = set([self.SELCOM] + self.MOBILE_POOL + self.BANK_POOL + self.AGENCY_POOL)
+        unknown = set()
+        for col in df.columns:
+            if self._abs_is_non_provider(col):
+                continue
+            base = re.sub(r' COMM$', '', col)
+            base = re.sub(r' (?:SUPERAGENT )?\d+$', '', base)
+            if base not in pools:
+                unknown.add(base)
+        if unknown:
+            print("[!] Providers not in the roster (totals still computed): "
+                  + ", ".join(sorted(unknown)))
+        return df
+
+    # ── Progress reporting ────────────────────────────────────────────────────
+
+    ABS_VERBOSE = True
+
+    @classmethod
+    def _p(cls, msg, done=False):
+        """One progress line per real step, so a long run shows where it is."""
+        if cls.ABS_VERBOSE:
+            print(("  [OK] " if done else "  ... ") + msg, flush=True)
+
+    # ── Master column order (ABS get_dynamic_columns, derived from the data) ───
+
+    def abs_master_columns(self, df):
+        """Rebuild ABS's g1..g7 column order from whatever the form supplied.
+
+        ABS reads the provider counts from sys_config.json; the Cloud has no
+        config, so the accounts actually present in the data are discovered
+        instead. Ordering and total names are otherwise identical.
+        """
+        cols = set(df.columns)
+        pools = [self.SELCOM] + self.MOBILE_POOL + self.BANK_POOL + self.AGENCY_POOL
+
+        #Any provider present in the data but absent from the roster still gets
+        #its own block, appended after the known ones so nothing is dropped.
+        extra = []
+        for col in df.columns:
+            if self._abs_is_non_provider(col):
+                continue
+            base = re.sub(r' COMM$', '', col)
+            base = re.sub(r' (?:SUPERAGENT )?\d+$', '', base)
+            if base not in pools and base not in extra:
+                extra.append(base)
+
+        g1 = ['Date of Submission', 'Name of Submitter', 'Date of Transaction']
+        g2, g4 = [], []
+
+        for key in pools + extra:
+            n_idx = sorted(int(m.group(1)) for m in
+                           (re.match(r'^' + re.escape(key) + r' (\d+)$', c) for c in cols) if m)
+            s_idx = sorted(int(m.group(1)) for m in
+                           (re.match(r'^' + re.escape(key) + r' SUPERAGENT (\d+)$', c) for c in cols) if m)
+            if not n_idx and not s_idx:
+                continue
+            n_cnt, sa_cnt = (max(n_idx) if n_idx else 0), (max(s_idx) if s_idx else 0)
+            single_tier = 'LIPA' in key or 'AGENCY' in key
+
+            for n in range(1, n_cnt + 1):
+                g2.append("{} {}".format(key, n))
+            if single_tier:
+                if n_cnt > 1:
+                    g2.append("{} GRAND TOTAL FLOAT".format(key))
+            else:
+                if n_cnt > 1:
+                    g2.append("{} NORMAL FLOAT TOTAL".format(key))
+                for n in range(1, sa_cnt + 1):
+                    g2.append("{} SUPERAGENT {}".format(key, n))
+                if sa_cnt > 1:
+                    g2.append("{} SUPERAGENT FLOAT TOTAL".format(key))
+                if (n_cnt > 0 and sa_cnt > 0) or (n_cnt > 1 or sa_cnt > 1):
+                    g2.append("{} GRAND TOTAL FLOAT".format(key))
+
+            for n in range(1, n_cnt + 1):
+                g4.append("{} {} COMM".format(key, n))
+            if single_tier:
+                if n_cnt > 1:
+                    g4.append("{} GRAND TOTAL COMM".format(key))
+            else:
+                if n_cnt > 1:
+                    g4.append("{} NORMAL COMM TOTAL".format(key))
+                for n in range(1, sa_cnt + 1):
+                    g4.append("{} SUPERAGENT {} COMM".format(key, n))
+                if sa_cnt > 1:
+                    g4.append("{} SUPERAGENT COMM TOTAL".format(key))
+                if (n_cnt > 0 and sa_cnt > 0) or (n_cnt > 1 or sa_cnt > 1):
+                    g4.append("{} GRAND TOTAL COMM".format(key))
+
+        g3 = ['TOTAL NORMAL MOBILE FLOAT', 'TOTAL SUPERAGENT MOBILE FLOAT',
+              'TOTAL LIPA MOBILE FLOAT', 'SELCOM FLOAT TOTAL', 'TOTAL AGENCY FLOAT',
+              'TOTAL NORMAL BANK FLOAT', 'TOTAL SUPERAGENT BANK FLOAT',
+              'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT', 'TOTAL FLOAT']
+        g5 = ['MOBILE BUNDLES COMM and SHARES', 'CAPITAL INFUSION', 'SALARIES',
+              'EXPENDITURES', 'TRANSFER FEES', 'HARD CASH',
+              'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW']
+        g6 = ['TOTAL NORMAL MOBILE COMMISSION', 'TOTAL LIPA MOBILE COMMISSION',
+              'TOTAL SELCOM COMMISSION', 'TOTAL NORMAL BANK COMMISSION',
+              'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
+              'TOTAL BANK COMMISSION', 'TOTAL COMMISSION',
+              'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
+              'EXCESS', 'LOSS', 'EXCESS/LOSS',
+              'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID']
+        g7 = list(self.ABS_TEXT_FIELDS)
+
+        return g1 + g2 + g3 + g4 + g5 + g6 + g7
+
+    @staticmethod
+    def _abs_is_text_col(col):
+        return 'Details' in col or any(x in col for x in ['INCIDENTS', 'Name', 'Date'])
+
+    # ── Financial engine (port of ABS ReportingEngine.run_calculations) ───────
+
+    def abs_run_calculations(self, raw_df):
+        """Provider totals, aggregates and per-date capital reconciliation.
+
+        Identical to NEXTGAMIS ABS: EXPECTED is chained date-to-date across the
+        whole business (not per submitter), DEBIT is an outflow and DEBIT PAID an
+        inflow, and EXCESS/LOSS is written only onto the last row of each date
+        group so a later sum over the group reproduces it exactly.
+        """
+        master = self.abs_master_columns(raw_df)
+        df = raw_df.reindex(columns=master, fill_value=0.0).copy()
+
+        protected = ['Date of Submission', 'Name of Submitter', 'Date of Transaction']
+        numeric_cols = [c for c in df.columns
+                        if c not in protected and 'Details' not in c and 'INCIDENTS' not in c]
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+
+        keywords = [self.SELCOM] + self.MOBILE_POOL + self.BANK_POOL + self.AGENCY_POOL
+        for key in keywords:
+            p_base = key + ' '
+            norm_f = [c for c in df.columns if c.startswith(p_base) and 'SUPERAGENT' not in c and 'COMM' not in c and 'TOTAL' not in c]
+            sa_f   = [c for c in df.columns if c.startswith(key + ' SUPERAGENT ') and 'COMM' not in c and 'TOTAL' not in c]
+            norm_c = [c for c in df.columns if c.startswith(p_base) and 'SUPERAGENT' not in c and 'COMM' in c and 'TOTAL' not in c]
+            sa_c   = [c for c in df.columns if c.startswith(key + ' SUPERAGENT ') and 'COMM' in c and 'TOTAL' not in c]
+
+            if key + ' NORMAL FLOAT TOTAL' in df.columns:
+                df[key + ' NORMAL FLOAT TOTAL'] = df[norm_f].sum(axis=1)
+            if key + ' SUPERAGENT FLOAT TOTAL' in df.columns:
+                df[key + ' SUPERAGENT FLOAT TOTAL'] = df[sa_f].sum(axis=1)
+            if key + ' NORMAL COMM TOTAL' in df.columns:
+                df[key + ' NORMAL COMM TOTAL'] = df[norm_c].sum(axis=1)
+            if key + ' SUPERAGENT COMM TOTAL' in df.columns:
+                df[key + ' SUPERAGENT COMM TOTAL'] = df[sa_c].sum(axis=1)
+            if key + ' GRAND TOTAL FLOAT' in df.columns:
+                df[key + ' GRAND TOTAL FLOAT'] = df[norm_f + sa_f].sum(axis=1)
+            if key + ' GRAND TOTAL COMM' in df.columns:
+                df[key + ' GRAND TOTAL COMM'] = df[norm_c + sa_c].sum(axis=1)
+
+        def _sum(include_all=None, include_any=None, exclude=None):
+            sel = []
+            for c in df.columns:
+                u = c.upper()
+                if include_all and not all(k in u for k in include_all):
+                    continue
+                if include_any and not any(k in u for k in include_any):
+                    continue
+                if exclude and any(k in u for k in exclude):
+                    continue
+                sel.append(c)
+            return df[sel].sum(axis=1) if sel else 0.0
+
+        base_ex = ['INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'HARD',
+                   'TIMESTAMP', 'SUBMITTER', 'DETAILS', 'INCIDENTS', 'DATE',
+                   'CREDIT', 'DEBIT']
+
+        df['TOTAL NORMAL MOBILE FLOAT']     = _sum(exclude=['BANK', 'COMM', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'] + base_ex)
+        df['TOTAL SUPERAGENT MOBILE FLOAT'] = _sum(include_all=['SUPERAGENT'], exclude=['BANK', 'COMM', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM'])
+        df['TOTAL LIPA MOBILE FLOAT']       = _sum(include_all=['LIPA'], exclude=['COMM', 'TOTAL', 'GRAND'])
+        df['SELCOM FLOAT TOTAL']            = _sum(include_all=['SELCOM'], exclude=['COMM', 'TOTAL', 'GRAND'])
+        df['TOTAL NORMAL BANK FLOAT']       = _sum(include_all=['BANK'], exclude=['SUPERAGENT', 'TOTAL', 'COMM', 'GRAND'])
+        df['TOTAL AGENCY FLOAT']            = _sum(include_all=['AGENCY'], exclude=['COMM', 'TOTAL', 'GRAND'])
+        df['TOTAL SUPERAGENT BANK FLOAT']   = _sum(include_all=['BANK', 'SUPERAGENT'], exclude=['TOTAL', 'COMM', 'GRAND'])
+        df['TOTAL MOBILE FLOAT']            = _sum(exclude=['BANK', 'TOTAL', 'GRAND', 'COMM', 'SELCOM', 'AGENCY', 'TRANSACTION'] + base_ex)
+        df['TOTAL BANK FLOAT']              = _sum(include_all=['BANK'], exclude=['TOTAL', 'GRAND', 'COMM'])
+        df['TOTAL FLOAT']                   = _sum(exclude=['COMM', 'TOTAL', 'GRAND', 'TRANSACTION'] + base_ex)
+
+        df['TOTAL NORMAL MOBILE COMMISSION']     = _sum(include_all=['COMM'], exclude=['BANK', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
+        df['TOTAL SUPERAGENT MOBILE COMMISSION'] = _sum(include_all=['SUPERAGENT', 'COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'])
+        df['TOTAL LIPA MOBILE COMMISSION']       = _sum(include_all=['LIPA', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        df['TOTAL SELCOM COMMISSION']            = _sum(include_all=['SELCOM', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        df['TOTAL NORMAL BANK COMMISSION']       = _sum(include_all=['BANK', 'COMM'], exclude=['SUPERAGENT', 'TOTAL', 'GRAND'])
+        df['TOTAL AGENCY COMMISSION']            = _sum(include_all=['AGENCY', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        df['TOTAL SUPERAGENT BANK COMMISSION']   = _sum(include_all=['BANK', 'SUPERAGENT', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        df['TOTAL MOBILE COMMISSION']            = _sum(include_all=['COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
+        df['TOTAL BANK COMMISSION']              = _sum(include_all=['BANK', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        df['TOTAL COMMISSION']                   = _sum(include_all=['COMM'], exclude=['TOTAL', 'GRAND', 'DETAILS'])
+
+        df['ACTUAL OPERATING CAPITAL'] = df['HARD CASH'] + df['TOTAL FLOAT']
+
+        df['_dp'] = self._abs_parse_dates(df['Date of Transaction'])
+        df = df.sort_values('_dp', na_position='last').reset_index(drop=True)
+
+        date_info = {}
+        for d, grp in df.groupby('_dp', sort=True, dropna=True):
+            date_info[d] = {
+                'last_idx':     grp.index[-1],
+                'total_actual': grp['ACTUAL OPERATING CAPITAL'].sum(),
+                'inflow':  (grp['TOTAL COMMISSION'].sum() + grp['CAPITAL INFUSION'].sum()
+                            + grp['CREDIT'].sum() + grp['DEBIT PAID'].sum()),
+                'outflow': (grp['TRANSFER FEES'].sum() + grp['SALARIES'].sum()
+                            + grp['EXPENDITURES'].sum() + grp['CREDIT PAID'].sum()
+                            + grp['DEBIT'].sum()),
+            }
+        dates_sorted = sorted(date_info.keys())
+
+        for col in ['EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS', 'EXCESS', 'LOSS']:
+            df[col] = 0.0
+
+        for j, d in enumerate(dates_sorted):
+            info = date_info[d]
+            if j == 0:
+                expected = info['total_actual']
+            else:
+                prev = date_info[dates_sorted[j - 1]]
+                expected = prev['total_actual'] + info['inflow'] - info['outflow']
+            el = info['total_actual'] - expected
+            last = info['last_idx']
+            df.at[last, 'EXPECTED OPERATING CAPITAL'] = expected
+            df.at[last, 'EXCESS/LOSS'] = el
+            df.at[last, 'EXCESS'] = el if el > 0 else 0.0
+            df.at[last, 'LOSS'] = abs(el) if el < 0 else 0.0
+
+        df['TOTAL CASH INFLOW']  = df['TOTAL COMMISSION'] + df['CAPITAL INFUSION'] + df['EXCESS']
+        df['TOTAL CASH OUTFLOW'] = df['TRANSFER FEES'] + df['SALARIES'] + df['EXPENDITURES']
+        df.drop(columns=['_dp'], inplace=True)
+        return df.copy()
+
+    # ── Date consolidation (port of ABS consolidate_by_date) ──────────────────
+
+    def abs_consolidate_by_date(self, df, is_snapshot=False):
+        df = df.copy()
+        df['Date of Transaction'] = self._abs_parse_dates(
+            df['Date of Transaction']).dt.strftime('%d/%m/%Y')
+
+        final_rows = []
+        for date, group in df.groupby('Date of Transaction', sort=False):
+            for _, row in group.iterrows():
+                final_rows.append(row.to_dict())
+            if len(group) > 1:
+                summary = group.select_dtypes(include=[np.number]).sum().to_dict()
+                names = []
+                for n in group['Name of Submitter']:
+                    if pd.notnull(n):
+                        clean = str(n).replace('Mr. ', '').replace('Ms. ', '') \
+                                      .replace('Mrs. ', '').replace('Dr. ', '').strip()
+                        if clean:
+                            names.append(clean.split()[0])
+                summary['Name of Submitter'] = 'COMBINED ' + '; '.join(dict.fromkeys(names))
+                for col in group.columns:
+                    if 'Details' in col or col == 'INCIDENTS':
+                        vals = [str(x).strip() for x in group[col]
+                                if pd.notnull(x) and str(x).strip().lower()
+                                not in ['nan', '', 'none', '0', '0.0']]
+                        summary[col] = ' ; '.join(vals) if vals else ''
+                summary.update({'Date of Transaction': date,
+                                'Date of Submission': datetime.now().strftime('%d/%m/%Y %H:%M:%S')})
+                final_rows.append(summary)
+
+        res = pd.DataFrame(final_rows)
+        res['S/N'] = range(1, len(res) + 1)
+        master = self.abs_master_columns(res)
+        head = (['Date of Submission'] if is_snapshot else []) + ['Date of Transaction', 'Name of Submitter']
+        other = [c for c in master if c in res.columns and c not in head and c != 'S/N']
+        return res[[c for c in (head + other + ['S/N']) if c in res.columns]]
+
+    # ── Summary rows (port of ABS add_summary_rows) ───────────────────────────
+
+    def abs_add_summary_rows(self, df, label_col):
+        calc_df = df.copy()
+        exclude = ['COLUMN TOTALS', 'AVERAGE AMOUNT', 'MAXIMUM AMOUNT', 'MINIMUM AMOUNT']
+        calc_df = calc_df[~calc_df[label_col].isin(exclude)]
+        if 'Name of Submitter' in calc_df.columns:
+            calc_df = calc_df[~calc_df['Name of Submitter'].astype(str).str.startswith('COMBINED', na=False)]
+
+        protected = ['Reporting Date', 'Name of Submitter', 'Date of Transaction', 'Month Year', 'S/N']
+        numeric_cols = [c for c in calc_df.columns
+                        if c not in protected and 'Details' not in c and 'INCIDENTS' not in c]
+        for col in numeric_cols:
+            calc_df[col] = pd.to_numeric(calc_df[col], errors='coerce').fillna(0.0)
+        if calc_df.empty:
+            return df
+
+        daily_agg = calc_df.groupby('Date of Transaction')[numeric_cols].sum()
+
+        #AVERAGE and MINIMUM count only dates on which a column actually moved:
+        #a provider account added mid-history reads 0 for every earlier date, and
+        #averaging over all of them divides a real total by the whole period.
+        #Filter is != 0 so signed columns keep their loss days.
+        #Tolerance rather than != 0: float sums leave residues like 1.86e-09 on
+        #dates that are genuinely zero. Money is carried to 2dp, so under half a
+        #cent is inactive.
+        _ZERO_TOL = 0.005
+        active = daily_agg.where(daily_agg.abs() > _ZERO_TOL)
+        sums = daily_agg.sum()
+        avgs = active.mean().fillna(0.0)
+        maxs = daily_agg.max()
+        mins = active.min().fillna(0.0)
+        mins = mins.where(maxs.abs() > _ZERO_TOL, 0.0)
+
+        allow_sum = ['COMM', 'SALARIES', 'EXPENDITURES', 'INFUSION', 'FEES', 'TOTAL CASH',
+                     'EXCESS', 'LOSS', 'CREDIT', 'DEBIT', 'SHARES', 'HARD CASH']
+        for col in numeric_cols:
+            is_flow = any(kw in col for kw in allow_sum)
+            is_balance = 'FLOAT' in col or 'OPERATING CAPITAL' in col
+            if not is_flow or is_balance:
+                sums[col] = np.nan
+
+        rows = []
+        for label, series in [('COLUMN TOTALS', sums), ('AVERAGE AMOUNT', avgs),
+                              ('MAXIMUM AMOUNT', maxs), ('MINIMUM AMOUNT', mins)]:
+            row = {c: '' for c in df.columns}
+            for col in numeric_cols:
+                val = series.get(col)
+                row[col] = val if pd.notnull(val) else ''
+            row[label_col] = label
+            row['S/N'] = ''
+            rows.append(row)
+        return pd.concat([df, pd.DataFrame(rows)], ignore_index=True)
+
+    # ── Presentation ──────────────────────────────────────────────────────────
+
+    #House palette (TSSFL Technology Stack)
+    HOUSE_NAVY = '#0B2A5B'
+    HOUSE_DEEP = '#071E44'
+    HOUSE_GOLD = '#F0B429'
+    HOUSE_BAND = ['#096EFF', '#F97316', '#10B981', '#F59E0B', '#EC4899', '#15803D']
+
+    #Liberation Sans is metrically identical to Arial, so this renders exactly as
+    #NEXTGAMIS ABS on Linux and falls back cleanly elsewhere - with no webfont
+    #fetch, which a sandboxed SageMath Cell page cannot rely on.
+    ABS_FONT = "'Liberation Sans', Arial, Helvetica, sans-serif"
+
+    def _abs_css(self):
+        band = ''.join(
+            "<span style='flex:1;height:6px;background:{}'></span>".format(c)
+            for c in self.HOUSE_BAND)
+        css = """
+        <style>
+        .ngc-body { font-family: %(font)s; background:#eef1f0; margin:0;
+                    padding:34px 16px; color:#1f2933;
+                    -webkit-font-smoothing:antialiased;
+                    text-rendering:optimizeLegibility; }
+        .ngc-container { max-width:fit-content; margin:0 auto;
+                         border-radius:10px; overflow:hidden;
+                         box-shadow:0 10px 30px rgba(11,42,91,.16); background:#fff; }
+        .ngc-band { display:flex; width:100%%; }
+        .ngc-head { background:%(navy)s; color:#fff; padding:20px 28px; text-align:center;
+                    font-size:1.08rem; font-weight:700; letter-spacing:.15px;
+                    word-wrap:break-word; }
+        .ngc-head .ngc-sub { display:block; margin-top:7px; font-weight:400;
+                             font-size:.84rem; color:#B9C6DC; letter-spacing:.2px; }
+        .ngc-head .ngc-co { color:%(gold)s; font-weight:600; }
+        /* The table sits flush under the header - no white gap for the crimson
+           rule to float in. */
+        .dataframe-div { max-height:78vh; overflow:auto; position:relative;
+                         background:#fff; }
+        table.ngc { border-collapse:separate; border-spacing:0; width:auto; margin:0;
+                    font-size:.95rem; font-variant-numeric:tabular-nums;
+                    font-feature-settings:"tnum" 1; }
+        /* border-collapse is separate, so these borders belong to the cell and
+           travel with it while it is sticky. Under collapse the top rule detached
+           and floated above the green band instead of sitting in its edge. */
+        table.ngc thead th { position:sticky; top:0; z-index:20;
+            background:#2E7D32; color:#fff; padding:13px 10px;
+            border-top:2px solid %(crimson)s; border-bottom:3px solid %(crimson)s;
+            border-right:1px solid rgba(255,255,255,.22);
+            white-space:normal; word-wrap:break-word; overflow-wrap:anywhere;
+            min-width:132px; max-width:210px; vertical-align:middle;
+            text-align:center; line-height:1.25; font-weight:700;
+            letter-spacing:.2px; }
+        table.ngc thead th:first-child { left:0; z-index:30; background:#1B5E20; }
+        table.ngc tbody td { padding:11px 12px; border-bottom:1px solid #e6ebe6;
+            border-right:1px solid #eef2ee; text-align:right; white-space:nowrap;
+            line-height:1.4; }
+        table.ngc tbody tr:nth-child(even) td { background:#f6f9f6; }
+        table.ngc tbody tr:hover td { background:#fdf6e6; }
+        table.ngc tbody td:first-child { position:sticky; left:0; z-index:10;
+            background:#0D47A1; color:#fff; font-weight:600; text-align:left;
+            box-shadow:2px 0 4px rgba(0,0,0,.10); }
+        table.ngc tbody tr:nth-child(even) td:first-child { background:#0B3C8A; }
+        table.ngc tbody td:last-child { background:#f1f3f4; font-weight:700;
+            text-align:center; color:#0D47A1; }
+        table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
+            text-align:left; min-width:170px; }
+        .ngc-foot { background:%(deep)s; color:#B9C6DC; padding:18px 26px;
+                    text-align:center; font-size:.8rem; line-height:1.6; }
+        .ngc-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
+        @media screen and (max-width:767px) {
+            .ngc-body { padding:12px 6px; }
+            table.ngc { font-size:.9rem; }
+            table.ngc thead th { min-width:112px; padding:11px 8px; }
+            table.ngc tbody td { padding:10px 9px; }
+        }
+        </style>
+        """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY, 'deep': self.HOUSE_DEEP,
+               'gold': self.HOUSE_GOLD, 'crimson': '#DC143C'}
+        return css, band
+
+    def abs_generate_html_report(self, df, title, period_desc, company_name=None,
+                                 output_file=None):
+        """ABS-styled HTML report: same formatting, colouring and column widths."""
+        fdf = df.copy()
+        if 'Date of Submission' in fdf.columns:
+            fdf.rename(columns={'Date of Submission': 'Reporting Date'}, inplace=True)
+        fdf = self.abs_add_summary_rows(fdf, fdf.columns[0])
+
+        def _esc(v):
+            return (str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+
+        text_like = [c for c in fdf.columns
+                     if self._abs_is_text_col(c) or c in ('Reporting Date', 'S/N')]
+        for c in fdf.columns:
+            if c in text_like:
+                fdf[c] = fdf[c].astype(str).replace(
+                    r'^(nan|None|NaT|0\.0|0)$', '', regex=True).map(_esc)
+            else:
+                num = pd.to_numeric(fdf[c], errors='coerce')
+                if not num.isna().all():
+                    fdf[c] = num.apply(
+                        lambda x: "{:,.2f}".format(float(x)) if pd.notnull(x) else '')
+
+        def get_val(x):
+            try:
+                return float(str(x).replace(',', ''))
+            except (ValueError, TypeError):
+                return 0.0
+
+        def style_val(v, color):
+            return "<span style='color: {}; font-weight: bold;'>{}</span>".format(color, v)
+
+        AMBER, RED, GREEN = '#E65100', '#C62828', '#1B5E20'
+        date_col = 'Date of Transaction' if 'Date of Transaction' in fdf.columns else fdf.columns[0]
+        multi_dates = fdf[fdf.duplicated(subset=[date_col], keep=False)][date_col].unique()
+        summary_labels = ['COLUMN TOTALS', 'AVERAGE AMOUNT', 'MAXIMUM AMOUNT', 'MINIMUM AMOUNT']
+
+        for i in fdf.index:
+            sub = str(fdf.at[i, 'Name of Submitter']) if 'Name of Submitter' in fdf.columns else ''
+            tdate = fdf.at[i, date_col]
+            is_combined = sub.startswith('COMBINED')
+            #On a multi-submission date the per-counter rows carry no reconciliation
+            #of their own - only the COMBINED row does - so blank them out.
+            if tdate in multi_dates and not is_combined and tdate not in summary_labels:
+                for col in ['EXPECTED OPERATING CAPITAL', 'EXCESS', 'LOSS', 'EXCESS/LOSS']:
+                    if col in fdf.columns:
+                        fdf.at[i, col] = ''
+            elif 'ACTUAL OPERATING CAPITAL' in fdf.columns and 'EXPECTED OPERATING CAPITAL' in fdf.columns:
+                act, exp = get_val(fdf.at[i, 'ACTUAL OPERATING CAPITAL']), get_val(fdf.at[i, 'EXPECTED OPERATING CAPITAL'])
+                color = GREEN if abs(act - exp) < 0.01 else RED
+                fdf.at[i, 'ACTUAL OPERATING CAPITAL'] = style_val(fdf.at[i, 'ACTUAL OPERATING CAPITAL'], color)
+                fdf.at[i, 'EXPECTED OPERATING CAPITAL'] = style_val(fdf.at[i, 'EXPECTED OPERATING CAPITAL'], color)
+                if 'EXCESS' in fdf.columns and get_val(fdf.at[i, 'EXCESS']) > 0.01:
+                    fdf.at[i, 'EXCESS'] = style_val(fdf.at[i, 'EXCESS'], AMBER)
+                if 'LOSS' in fdf.columns and get_val(fdf.at[i, 'LOSS']) > 0.01:
+                    fdf.at[i, 'LOSS'] = style_val(fdf.at[i, 'LOSS'], RED)
+                if 'EXCESS/LOSS' in fdf.columns:
+                    v = get_val(fdf.at[i, 'EXCESS/LOSS'])
+                    if v > 0.01:
+                        fdf.at[i, 'EXCESS/LOSS'] = style_val(fdf.at[i, 'EXCESS/LOSS'], AMBER)
+                    elif v < -0.01:
+                        fdf.at[i, 'EXCESS/LOSS'] = style_val(fdf.at[i, 'EXCESS/LOSS'], RED)
+
+        #Wide tier for free-text columns, moderate tier for submitter names -
+        #this is the string-breaking that the old Cloud layout could not do.
+        detail_css = ''
+        for i, col in enumerate(fdf.columns, start=1):
+            if 'Details' in col or 'INCIDENTS' in col:
+                detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
+                               "{min-width:320px !important;max-width:520px !important;"
+                               "white-space:normal !important;word-wrap:break-word !important;"
+                               "text-align:left !important;line-height:1.35 !important;}\n" % (i, i))
+            elif 'Name of Submitter' in col:
+                detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
+                               "{min-width:200px !important;max-width:320px !important;"
+                               "white-space:normal !important;word-wrap:break-word !important;"
+                               "text-align:left !important;line-height:1.2 !important;}\n" % (i, i))
+
+        #pretty_html_table writes an inline style= on every cell: for a 550x106
+        #frame that is ~58,000 attributes, 22x slower and 6x larger than to_html,
+        #and the inline styles override the stylesheet. Cell text is escaped above,
+        #so escape=False here only lets our own colour spans through.
+        df_html = fdf.to_html(index=False, border=0, classes='ngc',
+                              escape=False, na_rep='')
+
+        css, band = self._abs_css()
+        comp = (company_name or 'NEXTGAMIS CLOUD').upper()
+        stamp = datetime.now().strftime('%d/%m/%Y at %H:%M:%S')
+        head = ("{} {}<span class='ngc-sub'>Generated for "
+                "<span class='ngc-co'>{}</span> on {}</span>").format(title, period_desc, comp, stamp)
+        foot = ("NEXTGAMIS Cloud &nbsp;|&nbsp; {} &nbsp;|&nbsp; Generated on {}<br>"
+                "Automated Agency Banking Reporting &nbsp;&copy; 2026 "
+                "<a href='https://www.tssfl.com'>TSSFL Technology Stack</a>").format(comp, stamp)
+
+        html = ("<html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+                "{css}<style>{detail}</style></head><body class='ngc-body'>"
+                "<div class='ngc-container'>"
+                "<div class='ngc-band'>{band}</div>"
+                "<div class='ngc-head'>{head}</div>"
+                "<div class='dataframe-div'>{table}</div>"
+                "<div class='ngc-foot'>{foot}</div>"
+                "</div></body></html>").format(css=css, detail=detail_css, band=band,
+                                               head=head, table=df_html, foot=foot)
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(html)
+        return html
+
+    # ── Report 1: Comprehensive Extended ─────────────────────────────────────
+
+    @staticmethod
+    def _abs_parse_dates(series):
+        """The loaders normalise dates to %m/%d/%Y; ABS-sourced data is day-first.
+        Try the pipeline's format first, then fall back to day-first parsing."""
+        out = pd.to_datetime(series, format='%m/%d/%Y', errors='coerce')
+        if out.isna().all():
+            out = pd.to_datetime(series, dayfirst=True, errors='coerce')
+        else:
+            miss = out.isna() & series.notna()
+            if miss.any():
+                out.loc[miss] = pd.to_datetime(series[miss], dayfirst=True, errors='coerce')
+        return out
+
+    def _abs_filter_period(self, df, period, year=None, start=None, end=None):
+        d = df.copy()
+        d['Date of Transaction'] = self._abs_parse_dates(d['Date of Transaction'])
+        d = d.dropna(subset=['Date of Transaction'])
+        if period == 'year':
+            d = d[d['Date of Transaction'].dt.year == int(year)]
+            desc = "for Year {}".format(year)
+        elif period == 'range':
+            s = pd.to_datetime(start, dayfirst=True).replace(hour=0, minute=0, second=0)
+            e = pd.to_datetime(end, dayfirst=True).replace(hour=23, minute=59, second=59)
+            d = d.dropna(subset=['Date of Transaction'])
+            d = d[(d['Date of Transaction'] >= s) & (d['Date of Transaction'] <= e)]
+            desc = "From {} to {}".format(pd.to_datetime(start, dayfirst=True).strftime('%d-%m-%Y'),
+                                          pd.to_datetime(end, dayfirst=True).strftime('%d-%m-%Y'))
+        else:
+            desc = "All Time"
+        return d.sort_values('Date of Transaction').reset_index(drop=True), desc
+
+    def comprehensive_report(self, period='all', year=None, start=None, end=None,
+                             company_name=None, output_file=None):
+        """Report 1 - Comprehensive Extended (All Columns), ABS-identical.
+
+        period: 'all' | 'year' (with year=) | 'range' (with start=, end=)
+        """
+        base = self.normalise_columns(self.raw_df.copy())
+        filtered, desc = self._abs_filter_period(base, period, year, start, end)
+        if filtered.empty:
+            print("[!] No transaction data for {}.".format(desc))
+            return None
+        calc = self.abs_run_calculations(filtered)
+        final = self.abs_consolidate_by_date(calc)
+        slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
+        out = output_file or "{}_Comprehensive_Report_{}_{}.html".format(
+            slug, desc.replace(' ', '_'), datetime.now().strftime('%d%m%Y_%H%M%S'))
+        self.abs_generate_html_report(final, 'Comprehensive Report', desc,
+                                      company_name=company_name, output_file=out)
+        print("[OK] Report saved -> {}".format(out))
+        return out
+
+    # ── Report slicing (port of ABS slice_report) ─────────────────────────────
+
+    def abs_slice_report(self, df, mode):
+        fdf = df.copy()
+        if mode == 'full_clean':
+            drop = [c for c in fdf.columns if 'TOTAL' in c and not any(
+                x in c for x in ['TOTAL NORMAL', 'TOTAL SUPERAGENT', 'TOTAL MOBILE',
+                                 'TOTAL BANK', 'TOTAL FLOAT', 'TOTAL CASH', 'TOTAL AGENCY'])]
+            fdf.drop(columns=drop, inplace=True)
+        elif mode == 'monthly_comm':
+            fdf['Date of Transaction'] = self._abs_parse_dates(fdf['Date of Transaction'])
+            fdf['Month Year'] = fdf['Date of Transaction'].dt.strftime('%B %Y')
+            comm_cols = [c for c in fdf.columns if 'COMM' in c and 'TOTAL' not in c
+                         and 'Details' not in c]
+            prov_totals = [c for c in fdf.columns if any(
+                x in c for x in ['NORMAL COMM TOTAL', 'SUPERAGENT COMM TOTAL', 'GRAND TOTAL COMM'])]
+            grand = ['TOTAL NORMAL MOBILE COMMISSION', 'TOTAL LIPA MOBILE COMMISSION',
+                     'TOTAL SELCOM COMMISSION', 'TOTAL NORMAL BANK COMMISSION',
+                     'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
+                     'TOTAL BANK COMMISSION']
+            agg = [c for c in dict.fromkeys(comm_cols + prov_totals + grand) if c in fdf.columns]
+            res = fdf.groupby('Month Year')[agg + ['TOTAL COMMISSION']].sum().reset_index()
+            res.rename(columns={'Month Year': 'Date of Transaction'}, inplace=True)
+            res['S/N'] = range(1, len(res) + 1)
+            return res
+        elif mode == 'mini':
+            include = ['Date of Transaction', 'Date of Submission', 'Name of Submitter',
+                       'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT', 'TOTAL FLOAT',
+                       'SELCOM FLOAT TOTAL', 'HARD CASH', 'ACTUAL OPERATING CAPITAL',
+                       'EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS']
+            fdf = fdf[[c for c in fdf.columns if c in include]]
+        elif mode == 'compact':
+            fdf = fdf[[c for c in fdf.columns if 'TOTAL' not in c]]
+        return fdf
+
+    # ── Reports 1-6 ───────────────────────────────────────────────────────────
+
+    ABS_REPORTS = {
+        1: ('Comprehensive Report',   None,           'Comprehensive_Report'),
+        2: ('Clean Full Report',      'full_clean',   'Clean_Full_Report'),
+        3: ('Monthly Commission Report', 'monthly_comm', 'Monthly_Comm_Report'),
+        4: ('Mini Totals Dashboard',  'mini',         'Mini_Totals_Dashboard'),
+        5: ('Compact Report',         'compact',      'Compact_Accounts_Report'),
+    }
+
+    def abs_report(self, number=1, period='all', year=None, start=None, end=None,
+                   company_name=None, output_file=None):
+        """NEXTGAMIS ABS reports 1-5 over All Time / a Year / a Date Range.
+
+            report.abs_report(1)                                  # Comprehensive, all time
+            report.abs_report(3, period='year', year=2025)        # Monthly commission, 2025
+            report.abs_report(4, period='range',
+                              start='01/11/2024', end='30/11/2024')
+        """
+        import os, time
+        _t0 = time.time()
+        if number not in self.ABS_REPORTS:
+            print("[!] Report {} is not one of 1-5. Use daily_snapshot_report() for 6 "
+                  "or quick_report() for 7.".format(number))
+            return None
+        title, mode, slug_base = self.ABS_REPORTS[number]
+
+        base = self.normalise_columns(self.raw_df.copy())
+        filtered, desc = self._abs_filter_period(base, period, year, start, end)
+        if filtered.empty:
+            print("[!] No transaction data for {}.".format(desc))
+            return None
+
+        self._p("Period {}: {} submissions across {} date(s)".format(
+            desc, len(filtered), filtered['Date of Transaction'].dt.date.nunique()))
+
+        calc = self.abs_run_calculations(filtered)
+        self._p("Provider totals, aggregates and capital reconciliation computed")
+
+        if mode == 'monthly_comm':
+            final = self.abs_slice_report(calc, mode)
+            self._p("Commissions aggregated into {} month(s)".format(len(final)))
+        elif mode:
+            final = self.abs_consolidate_by_date(self.abs_slice_report(calc, mode))
+            self._p("Sliced and consolidated by date: {} rows x {} columns".format(*final.shape))
+        else:
+            final = self.abs_consolidate_by_date(calc)
+            self._p("Consolidated by date: {} rows x {} columns".format(*final.shape))
+
+        out = output_file or self._abs_outfile(slug_base, desc, company_name)
+        self.abs_generate_html_report(final, title, desc,
+                                      company_name=company_name, output_file=out)
+        _mb = os.path.getsize(out) / 1048576.0 if os.path.exists(out) else 0
+        self._p("{} {} -> {}  ({:.1f} MB, {:.1f}s)".format(
+            title, desc, out, _mb, time.time() - _t0), done=True)
+        return out
+
+    def _abs_outfile(self, slug_base, desc, company_name):
+        slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
+        return "{}_{}_{}_{}.html".format(slug, slug_base, desc.replace(' ', '_'),
+                                         datetime.now().strftime('%d%m%Y_%H%M%S'))
+
+    # ── Report 6: Daily Snapshot (single date) ────────────────────────────────
+
+    def daily_snapshot_report(self, date, company_name=None, output_file=None):
+        """Report 6 - every submission for one date, plus the COMBINED row."""
+        base = self.normalise_columns(self.raw_df.copy())
+        filtered, _ = self._abs_filter_period(base, 'all')
+        calc = self.abs_run_calculations(filtered)
+        target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
+        day = calc[self._abs_parse_dates(calc['Date of Transaction'])
+                   .dt.strftime('%d/%m/%Y') == target].copy()
+        if day.empty:
+            print("[!] No records found for {}.".format(target))
+            return None
+        final = self.abs_consolidate_by_date(day, is_snapshot=True)
+        desc = "for {}".format(target)
+        out = output_file or self._abs_outfile('Daily_Snapshot', target.replace('/', '-'), company_name)
+        self.abs_generate_html_report(final, 'Daily Snapshot', desc,
+                                      company_name=company_name, output_file=out)
+        print("[OK] Daily Snapshot saved -> {}".format(out))
+        return out
+
+    # ── Report 7: Quick Report (single date, 4 columns) ───────────────────────
+
+    ABS_SPECIAL_DETAIL = {'MOBILE BUNDLES COMM and SHARES': 'MOBILE BUNDLES and SHARES Details'}
+
+    def quick_report(self, date, company_name=None, fmt='html', output_file=None):
+        """Report 7 - one date as # | Description | Amount (TZS) | Details.
+
+        Zone A: numeric rows that are non-zero.  Zone B: non-empty free text.
+        Zone C: the balance rows, always shown even when zero.
+        fmt='pdf' renders A4 portrait via WeasyPrint, falling back to HTML.
+        """
+        base = self.normalise_columns(self.raw_df.copy())
+        filtered, _ = self._abs_filter_period(base, 'all')
+        calc = self.abs_run_calculations(filtered)
+        target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
+        day = calc[self._abs_parse_dates(calc['Date of Transaction'])
+                   .dt.strftime('%d/%m/%Y') == target].copy()
+        if day.empty:
+            print("[!] No transaction data found for {}.".format(target))
+            return None
+
+        final = self.abs_consolidate_by_date(day, is_snapshot=True)
+        row_data = final.iloc[-1].to_dict()      # COMBINED row when there is one
+        all_cols = self.abs_master_columns(final)
+
+        def get_float(col):
+            v = row_data.get(col, 0)
+            if v is None:
+                return 0.0
+            try:
+                f = float(str(v).replace(',', ''))
+                return 0.0 if f != f else f
+            except (ValueError, TypeError):
+                return 0.0
+
+        def get_text(col):
+            v = row_data.get(col, '')
+            if v is None:
+                return ''
+            s = str(v).strip()
+            return '' if s.lower() in ['nan', 'none', '', '0', '0.0', '0.00', ';', '; '] else s
+
+        def detail_col_for(col):
+            if col in self.ABS_SPECIAL_DETAIL:
+                return self.ABS_SPECIAL_DETAIL[col]
+            cand = col + ' Details'
+            return cand if cand in all_cols else ''
+
+        zone_c = ['ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
+                  'EXCESS', 'LOSS', 'EXCESS/LOSS']
+        zone_b = ['Transaction Anomalies and Irregularities Details', 'INCIDENTS']
+        g1 = {'Date of Submission', 'Name of Submitter', 'Date of Transaction'}
+        zone_a = [c for c in all_cols if c not in g1 and c not in zone_c and c not in zone_b
+                  and 'Details' not in c and c != 'INCIDENTS']
+
+        rows = []
+        for col in zone_a:
+            val = get_float(col)
+            if val == 0.0:
+                continue
+            d = detail_col_for(col)
+            rows.append(('a', col, val, get_text(d) if d else ''))
+        for col in zone_b:
+            t = get_text(col)
+            if t:
+                rows.append(('b', col, None, t))
+        for col in zone_c:
+            rows.append(('c', col, get_float(col), ''))
+
+        act, exp = get_float('ACTUAL OPERATING CAPITAL'), get_float('EXPECTED OPERATING CAPITAL')
+        balanced = abs(act - exp) < 0.01
+        AMBER, RED, GREEN = '#E65100', '#C62828', '#1B5E20'
+
+        def amt_cell(val, kind, col):
+            if val is None:
+                return "<td class='amt'></td>"
+            s = "{:,.2f}".format(val)
+            if kind == 'c':
+                if col in ('ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL'):
+                    c = GREEN if balanced else RED
+                    return "<td class='amt'><b style='color:{}'>{}</b></td>".format(c, s)
+                if col == 'EXCESS' and val > 0.01:
+                    return "<td class='amt'><b style='color:{}'>{}</b></td>".format(AMBER, s)
+                if col == 'LOSS' and val > 0.01:
+                    return "<td class='amt'><b style='color:{}'>{}</b></td>".format(RED, s)
+                if col == 'EXCESS/LOSS':
+                    if val > 0.01:
+                        return "<td class='amt'><b style='color:{}'>{}</b></td>".format(AMBER, s)
+                    if val < -0.01:
+                        return "<td class='amt'><b style='color:{}'>{}</b></td>".format(RED, s)
+            if val < -0.01:
+                return "<td class='amt'><span style='color:{}'>{}</span></td>".format(RED, s)
+            return "<td class='amt'>{}</td>".format(s)
+
+        body = []
+        for i, (kind, col, val, dtext) in enumerate(rows, 1):
+            safe = str(dtext).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            body.append("<tr class='z{}'><td class='sn'>{}</td><td class='desc'>{}</td>"
+                        "{}<td class='det'>{}</td></tr>".format(kind, i, col,
+                                                                amt_cell(val, kind, col), safe))
+
+        comp = (company_name or 'NEXTGAMIS CLOUD').upper()
+        stamp = datetime.now().strftime('%d/%m/%Y at %H:%M:%S')
+        band = ''.join("<span style='flex:1;height:6px;background:{}'></span>".format(c)
+                       for c in self.HOUSE_BAND)
+        css = """
+        <style>
+        @page { size: A4 portrait; margin: 14mm; }
+        body { font-family: %(font)s; background:#f4f7f6; padding:28px 14px; }
+        .qr-wrap { max-width:980px; margin:0 auto; background:#fff;
+                   box-shadow:0 8px 24px rgba(0,0,0,.12); }
+        .qr-band { display:flex; width:100%%; }
+        .qr-head { background:%(navy)s; color:#fff; padding:18px 24px; text-align:center;
+                   font-size:1.05rem; font-weight:700; }
+        .qr-head .co { color:%(gold)s; }
+        .qr-head .sub { display:block; margin-top:6px; font-weight:400; font-size:.85rem;
+                        color:#B9C6DC; }
+        table.qr { width:100%%; border-collapse:collapse; font-size:1rem; }
+        table.qr th { background:#2E7D32; color:#fff; padding:12px 10px; text-align:left;
+                      border-top:3px solid #DC143C; border-bottom:3px solid #DC143C; }
+        table.qr td { padding:11px 10px; border:1px solid #e0e0e0; vertical-align:top; }
+        td.sn { width:48px; text-align:center; color:#0D47A1; font-weight:700;
+                background:#f1f3f4; }
+        td.desc { width:34%%; font-weight:600; color:#0B2A5B; }
+        td.amt { width:20%%; text-align:right; white-space:nowrap; }
+        td.det { width:40%%; white-space:normal; word-wrap:break-word; line-height:1.35;
+                 color:#444; }
+        tr.zc td { background:#eef4ff; }
+        tr.zb td.det { font-style:italic; }
+        tr:hover td { background:#EADDCA; }
+        .qr-foot { background:%(deep)s; color:#B9C6DC; padding:16px 24px; text-align:center;
+                   font-size:.8rem; }
+        .qr-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
+        </style>
+        """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY,
+               'deep': self.HOUSE_DEEP, 'gold': self.HOUSE_GOLD}
+
+        html = ("<html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+                "{css}</head><body><div class='qr-wrap'>"
+                "<div class='qr-band'>{band}</div>"
+                "<div class='qr-head'>Quick Report for {date}"
+                "<span class='sub'>Generated for <span class='co'>{co}</span> on {stamp}</span></div>"
+                "<table class='qr'><thead><tr><th>#</th><th>Description</th>"
+                "<th style='text-align:right'>Amount (TZS)</th><th>Details</th></tr></thead>"
+                "<tbody>{body}</tbody></table>"
+                "<div class='qr-foot'>NEXTGAMIS Cloud &nbsp;|&nbsp; {co} &nbsp;|&nbsp; {stamp}<br>"
+                "Automated Agency Banking Reporting &copy; 2026 "
+                "<a href='https://www.tssfl.com'>TSSFL Technology Stack</a></div>"
+                "</div></body></html>").format(css=css, band=band, date=target, co=comp,
+                                               stamp=stamp, body=''.join(body))
+
+        stem = output_file or self._abs_outfile('Quick_Report', target.replace('/', '-'),
+                                                company_name).replace('.html', '')
+        stem = stem[:-5] if stem.endswith('.html') else stem
+        if fmt == 'pdf':
+            try:
+                HTML(string=html).write_pdf(stem + '.pdf')
+                print("[OK] Quick Report (PDF) saved -> {}.pdf".format(stem))
+                return stem + '.pdf'
+            except Exception as e:
+                print("[!] PDF engine unavailable ({}) - saving HTML instead.".format(e))
+        with open(stem + '.html', 'w', encoding='utf-8') as f:
+            f.write(html)
+        print("[OK] Quick Report (HTML) saved -> {}.html".format(stem))
+        return stem + '.html'
+

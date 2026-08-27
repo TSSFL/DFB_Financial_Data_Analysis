@@ -1725,82 +1725,101 @@ class FinancialReport:
     ABS_FONT = "'Liberation Sans', Arial, Helvetica, sans-serif"
 
     def _abs_css(self):
+        """NEXTGAMIS Cloud palette.
+
+        Light theme by design: dark ink on pale grounds, never white-on-dark.
+        That is what makes a wide financial table readable, and it removes the
+        whole class of "text disappears on hover/selection" faults - the ink is
+        dark in every state, so only the ground changes.
+
+        Navy + gold (the TSSFL house colours), deliberately distinct from
+        NEXTGAMIS ABS green + crimson. Cloud mirrors ABS in structure and logic,
+        not in colour.
+        """
         band = ''.join(
             "<span style='flex:1;height:6px;background:{}'></span>".format(c)
             for c in self.HOUSE_BAND)
         css = """
         <style>
-        .ngc-body { font-family: %(font)s; background:#eef1f0; margin:0;
-                    padding:34px 16px; color:#1f2933;
+        .ngc-body { font-family: %(font)s; background:#eceff3; margin:0;
+                    padding:34px 16px; color:#16243a;
                     -webkit-font-smoothing:antialiased;
                     text-rendering:optimizeLegibility; }
-        /* Selected text was invisible on the navy first column and the green
-           header - white on the browser's default light-blue highlight. Gold
-           ground with navy ink reads on every background used here. */
-        ::selection { background:%(gold)s; color:#0B2A5B; }
-        ::-moz-selection { background:%(gold)s; color:#0B2A5B; }
-        .ngc-container { max-width:fit-content; margin:0 auto;
-                         border-radius:10px; overflow:hidden;
-                         box-shadow:0 10px 30px rgba(11,42,91,.16); background:#fff; }
+        ::selection     { background:%(gold)s; color:#0B2A5B; }
+        ::-moz-selection{ background:%(gold)s; color:#0B2A5B; }
+
+        .ngc-container { max-width:fit-content; margin:0 auto; border-radius:10px;
+                         overflow:hidden; background:#fff;
+                         box-shadow:0 10px 34px rgba(11,42,91,.20); }
         .ngc-band { display:flex; width:100%%; }
         .ngc-head { background:%(navy)s; color:#fff; padding:20px 28px; text-align:center;
-                    font-size:1.08rem; font-weight:700; letter-spacing:.15px;
+                    font-size:1.2rem; font-weight:700; letter-spacing:.15px;
                     word-wrap:break-word; }
         .ngc-head .ngc-sub { display:block; margin-top:7px; font-weight:400;
-                             font-size:.84rem; color:#B9C6DC; letter-spacing:.2px; }
+                             font-size:.92rem; color:#c7d4e6; letter-spacing:.2px; }
         .ngc-head .ngc-co { color:%(gold)s; font-weight:600; }
-        /* The table sits flush under the header - no white gap for the crimson
-           rule to float in. */
-        .dataframe-div { max-height:78vh; overflow:auto; position:relative;
-                         background:#fff; }
+
+        .dataframe-div { max-height:78vh; overflow:auto; position:relative; background:#fff; }
         table.ngc { border-collapse:separate; border-spacing:0; width:auto; margin:0;
-                    font-size:.95rem; font-variant-numeric:tabular-nums;
+                    font-size:1.08rem; font-variant-numeric:tabular-nums;
                     font-feature-settings:"tnum" 1; }
-        /* border-collapse is separate, so these borders belong to the cell and
-           travel with it while it is sticky. Under collapse the top rule detached
-           and floated above the green band instead of sitting in its edge. */
+
+        /* Header: white ground, navy ink, gold rule. Borders belong to the cell
+           because border-collapse is separate, so they stay put while it is sticky. */
         table.ngc thead th { position:sticky; top:0; z-index:20;
-            background:#2f7d33; color:#fff; padding:12px 11px;
-            border-top:2px solid %(crimson)s; border-bottom:2px solid %(crimson)s;
-            border-right:1px solid rgba(255,255,255,.22);
+            background:#ffffff; color:#0B2A5B; padding:14px 13px;
+            border-bottom:2px solid %(gold)s; border-right:1px solid #e3e9f1;
             white-space:normal; word-wrap:break-word; overflow-wrap:anywhere;
-            min-width:132px; max-width:210px; vertical-align:middle;
-            text-align:center; line-height:1.25; font-weight:700;
-            letter-spacing:.2px; }
-        table.ngc thead th:first-child { left:0; z-index:30; background:#1B5E20; }
-        table.ngc tbody td { padding:9px 12px; border-bottom:1px solid #e8ece8;
-            border-right:1px solid #f0f3f0; text-align:right; white-space:nowrap;
-            line-height:1.45; color:#22303c; }
-        table.ngc tbody tr:nth-child(even) td { background:#f7faf7; }
-        table.ngc tbody tr:hover td { background:#fdf4e3; }
-        /* Summary block reads as a footer, not as more data. */
-        table.ngc tbody tr:nth-last-child(-n+4) td { background:#eef3fa;
-            font-weight:600; border-top:1px solid #d7e1ee; }
-        table.ngc tbody tr:nth-last-child(-n+4) td:first-child {
-            background:#0e2a55; letter-spacing:.3px; }
-        /* One navy family throughout: header #0B2A5B, this #14356b, footer #071E44.
-           The old #0D47A1 was a third, brighter blue that fought both. */
+            min-width:138px; max-width:210px; vertical-align:middle;
+            text-align:center; line-height:1.32; font-weight:700;
+            font-size:1.06rem; letter-spacing:.2px; }
+        table.ngc thead th:first-child { left:0; z-index:30; background:#fff; }
+
+        /* Body: dark ink throughout, pale alternating grounds. */
+        table.ngc tbody td { padding:11px 14px; border-bottom:1px solid #e6ebf2;
+            border-right:1px solid #eef2f7; text-align:right; white-space:nowrap;
+            line-height:1.5; color:#16243a; background:#ffffff; }
+        table.ngc tbody tr:nth-child(even) td { background:#e9f0fa; color:#123055; }
+
+        /* Sticky index column: pale gold so it separates from the data without
+           inverting to white ink. */
         table.ngc tbody td:first-child { position:sticky; left:0; z-index:10;
-            background:#14356b; color:#fff; font-weight:600; text-align:left;
-            letter-spacing:.2px;
-            box-shadow:2px 0 5px rgba(0,0,0,.13); }
-        table.ngc tbody tr:nth-child(even) td:first-child { background:#102c5a; }
-        table.ngc tbody td:last-child { background:#f2f4f6; font-weight:700;
-            text-align:center; color:#14356b; }
+            background:#fff6e0; color:#0B2A5B; font-weight:700; text-align:left;
+            letter-spacing:.2px; border-right:2px solid %(gold)s;
+            box-shadow:2px 0 6px rgba(11,42,91,.10); }
+        table.ngc tbody tr:nth-child(even) td:first-child { background:#fdeec8; }
+
+        /* Hover only deepens the ground - the ink stays dark, so nothing can
+           disappear. (The old rule repainted the navy index cell in a pale tint
+           and left its white text invisible.) */
+        table.ngc tbody tr:hover td { background:#dce8f7; color:#0B2A5B; }
+        table.ngc tbody tr:hover td:first-child { background:#f7dfa4; color:#0B2A5B; }
+
+        /* Summary block reads as a footer, not as more data. */
+        table.ngc tbody tr:nth-last-child(-n+4) td { background:#dfe8f4;
+            font-weight:700; color:#0B2A5B; border-top:1px solid #c6d5e8; }
+        table.ngc tbody tr:nth-last-child(-n+4) td:first-child { background:#f4e3b4; }
+        table.ngc tbody tr:nth-last-child(-n+4):hover td { background:#d2e0f2; }
+        table.ngc tbody tr:nth-last-child(-n+4):hover td:first-child { background:#f7dfa4; }
+
+        table.ngc tbody td:last-child { background:#f2f5f9; font-weight:700;
+            text-align:center; color:#12386f; }
         table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
-            text-align:left; min-width:170px; }
-        .ngc-foot { background:%(deep)s; color:#B9C6DC; padding:18px 26px;
-                    text-align:center; font-size:.8rem; line-height:1.6; }
+            text-align:left; min-width:174px; }
+
+        .ngc-foot { background:%(deep)s; color:#c7d4e6; padding:18px 26px;
+                    text-align:center; font-size:.88rem; line-height:1.6; }
         .ngc-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
+
         @media screen and (max-width:767px) {
             .ngc-body { padding:12px 6px; }
-            table.ngc { font-size:.9rem; }
-            table.ngc thead th { min-width:112px; padding:11px 8px; }
-            table.ngc tbody td { padding:10px 9px; }
+            table.ngc { font-size:1.02rem; }
+            table.ngc thead th { min-width:120px; padding:12px 10px; font-size:1rem; }
+            table.ngc tbody td { padding:10px 11px; }
         }
         </style>
         """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY, 'deep': self.HOUSE_DEEP,
-               'gold': self.HOUSE_GOLD, 'crimson': '#DC143C'}
+               'gold': self.HOUSE_GOLD}
         return css, band
 
     def abs_generate_html_report(self, df, title, period_desc, company_name=None,

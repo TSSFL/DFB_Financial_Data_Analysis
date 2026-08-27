@@ -1734,6 +1734,11 @@ class FinancialReport:
                     padding:34px 16px; color:#1f2933;
                     -webkit-font-smoothing:antialiased;
                     text-rendering:optimizeLegibility; }
+        /* Selected text was invisible on the navy first column and the green
+           header - white on the browser's default light-blue highlight. Gold
+           ground with navy ink reads on every background used here. */
+        ::selection { background:%(gold)s; color:#0B2A5B; }
+        ::-moz-selection { background:%(gold)s; color:#0B2A5B; }
         .ngc-container { max-width:fit-content; margin:0 auto;
                          border-radius:10px; overflow:hidden;
                          box-shadow:0 10px 30px rgba(11,42,91,.16); background:#fff; }
@@ -1755,25 +1760,33 @@ class FinancialReport:
            travel with it while it is sticky. Under collapse the top rule detached
            and floated above the green band instead of sitting in its edge. */
         table.ngc thead th { position:sticky; top:0; z-index:20;
-            background:#2E7D32; color:#fff; padding:13px 10px;
-            border-top:2px solid %(crimson)s; border-bottom:3px solid %(crimson)s;
+            background:#2f7d33; color:#fff; padding:12px 11px;
+            border-top:2px solid %(crimson)s; border-bottom:2px solid %(crimson)s;
             border-right:1px solid rgba(255,255,255,.22);
             white-space:normal; word-wrap:break-word; overflow-wrap:anywhere;
             min-width:132px; max-width:210px; vertical-align:middle;
             text-align:center; line-height:1.25; font-weight:700;
             letter-spacing:.2px; }
         table.ngc thead th:first-child { left:0; z-index:30; background:#1B5E20; }
-        table.ngc tbody td { padding:11px 12px; border-bottom:1px solid #e6ebe6;
-            border-right:1px solid #eef2ee; text-align:right; white-space:nowrap;
-            line-height:1.4; }
-        table.ngc tbody tr:nth-child(even) td { background:#f6f9f6; }
-        table.ngc tbody tr:hover td { background:#fdf6e6; }
+        table.ngc tbody td { padding:9px 12px; border-bottom:1px solid #e8ece8;
+            border-right:1px solid #f0f3f0; text-align:right; white-space:nowrap;
+            line-height:1.45; color:#22303c; }
+        table.ngc tbody tr:nth-child(even) td { background:#f7faf7; }
+        table.ngc tbody tr:hover td { background:#fdf4e3; }
+        /* Summary block reads as a footer, not as more data. */
+        table.ngc tbody tr:nth-last-child(-n+4) td { background:#eef3fa;
+            font-weight:600; border-top:1px solid #d7e1ee; }
+        table.ngc tbody tr:nth-last-child(-n+4) td:first-child {
+            background:#0e2a55; letter-spacing:.3px; }
+        /* One navy family throughout: header #0B2A5B, this #14356b, footer #071E44.
+           The old #0D47A1 was a third, brighter blue that fought both. */
         table.ngc tbody td:first-child { position:sticky; left:0; z-index:10;
-            background:#0D47A1; color:#fff; font-weight:600; text-align:left;
-            box-shadow:2px 0 4px rgba(0,0,0,.10); }
-        table.ngc tbody tr:nth-child(even) td:first-child { background:#0B3C8A; }
-        table.ngc tbody td:last-child { background:#f1f3f4; font-weight:700;
-            text-align:center; color:#0D47A1; }
+            background:#14356b; color:#fff; font-weight:600; text-align:left;
+            letter-spacing:.2px;
+            box-shadow:2px 0 5px rgba(0,0,0,.13); }
+        table.ngc tbody tr:nth-child(even) td:first-child { background:#102c5a; }
+        table.ngc tbody td:last-child { background:#f2f4f6; font-weight:700;
+            text-align:center; color:#14356b; }
         table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
             text-align:left; min-width:170px; }
         .ngc-foot { background:%(deep)s; color:#B9C6DC; padding:18px 26px;
@@ -1805,8 +1818,12 @@ class FinancialReport:
                      if self._abs_is_text_col(c) or c in ('Reporting Date', 'S/N')]
         for c in fdf.columns:
             if c in text_like:
-                fdf[c] = fdf[c].astype(str).replace(
-                    r'^(nan|None|NaT|0\.0|0)$', '', regex=True).map(_esc)
+                #pandas 3 keeps NaN as NaN through astype(str) instead of turning it
+                #into the string 'nan', so the regex below never matched it and _esc
+                #later rendered a literal "nan" in every empty Details cell.
+                #fillna() has to run before the regex for the cell to come out blank.
+                fdf[c] = fdf[c].astype(str).fillna('').replace(
+                    r'^(nan|None|NaT|0\.0|0|0\.00)$', '', regex=True).map(_esc)
             else:
                 num = pd.to_numeric(fdf[c], errors='coerce')
                 if not num.isna().all():
@@ -2192,7 +2209,7 @@ class FinancialReport:
         table.qr th { background:#2E7D32; color:#fff; padding:12px 10px; text-align:left;
                       border-top:3px solid #DC143C; border-bottom:3px solid #DC143C; }
         table.qr td { padding:11px 10px; border:1px solid #e0e0e0; vertical-align:top; }
-        td.sn { width:48px; text-align:center; color:#0D47A1; font-weight:700;
+        td.sn { width:48px; text-align:center; color:#14356b; font-weight:700;
                 background:#f1f3f4; }
         td.desc { width:34%%; font-weight:600; color:#0B2A5B; }
         td.amt { width:20%%; text-align:right; white-space:nowrap; }

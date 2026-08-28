@@ -2308,7 +2308,9 @@ class FinancialReport:
         body { font-family: %(font)s; background:#f4f7f6; padding:28px 14px; }
         .qr-wrap { max-width:980px; margin:0 auto; background:#fff;
                    box-shadow:0 8px 24px rgba(0,0,0,.12); }
-        .qr-band { height:7px; width:100%%; background:%(bandgrad)s; }
+        /* No width:100%% - a block box already fills its containing block
+           exactly, and stays right whatever padding the wrap later grows. */
+        .qr-band { height:7px; background:%(bandgrad)s; }
         /* Both bands close with a thin gold rule, matching the main reports:
            brand colours on top, navy body, gold at the lower boundary. */
         .qr-head { background:%(navy)s; color:#fff; padding:18px 24px; text-align:center;
@@ -2324,6 +2326,15 @@ class FinancialReport:
                       border-top:3px solid #DC143C; border-bottom:3px solid #DC143C; }
         table.qr td { padding:12px 11px; border:1px solid #dbe2ea; vertical-align:top;
                       line-height:1.45; }
+        /* border-collapse:collapse makes an outer cell border straddle the table
+           edge - half of it paints outside the box. So the body rows sat a hair
+           proud of the bands, the head and the foot, while the header row (which
+           carries no side borders) sat a hair inside the body rows: three different
+           vertical edges within one card. Dropping the outer side borders gives the
+           table a zero-width outer border, so band, head, table and foot all share
+           one straight line down each side. */
+        table.qr th:first-child, table.qr td:first-child { border-left:0; }
+        table.qr th:last-child,  table.qr td:last-child  { border-right:0; }
         td.sn { width:48px; text-align:center; color:#14356b; font-weight:700;
                 font-size:1.02rem; background:#eef2f7; }
         td.desc { width:34%%; font-weight:700; color:#0B2A5B; font-size:1.06rem; }

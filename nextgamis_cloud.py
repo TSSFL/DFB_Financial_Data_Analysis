@@ -1776,23 +1776,6 @@ class FinancialReport:
     #fetch, which a sandboxed SageMath Cell page cannot rely on.
     ABS_FONT = "'Liberation Sans', Arial, Helvetica, sans-serif"
 
-    def _band_gradient(self):
-        """The brand strip as a single linear-gradient with hard stops.
-
-        It used to be flex children with flex:1 each. That lays out in a browser
-        but WeasyPrint does not lay out flex, so the strip vanished from every
-        PDF. One gradient renders identically in both.
-        """
-        #Classic two-stop-per-colour form. The compact `colour 0% 16%` syntax is
-        #newer CSS and WeasyPrint ignores it, which left the strip missing from PDFs.
-        n = len(self.HOUSE_BAND)
-        stops = []
-        for i, c in enumerate(self.HOUSE_BAND):
-            a, b = 100.0 * i / n, 100.0 * (i + 1) / n
-            stops.append("{} {:.3f}%".format(c, a))
-            stops.append("{} {:.3f}%".format(c, b))
-        return "linear-gradient(to right, " + ", ".join(stops) + ")"
-
     def _band_html(self):
         """The brand strip as six laid-out cells rather than six painted stops.
 
@@ -1838,8 +1821,14 @@ class FinancialReport:
         .ngc-container { max-width:fit-content; margin:0 auto; border-radius:10px;
                          overflow:hidden; background:#fff;
                          box-shadow:0 10px 34px rgba(11,42,91,.20); }
+        /* No background on the strip itself. A linear-gradient is painted, and a
+           painted box whose left edge lands on a fractional device pixel fills
+           that partial pixel at nearly full colour, while the solid background of
+           the navy head beside it snaps to the pixel grid - so the strip sat one
+           pixel proud on the left. The cells carry solid colours, which snap the
+           same way the head does. */
         .ngc-band { display:table; table-layout:fixed; width:100%%; height:7px;
-                    border-collapse:collapse; background:%(bandgrad)s; }
+                    border-collapse:collapse; }
         .ngc-band span { display:table-cell; height:7px; }
         /* Each band is closed by a thin gold rule: brand colours on top, navy
            body, gold at the lower boundary - header and footer mirror each other. */
@@ -1933,7 +1922,7 @@ class FinancialReport:
         }
         </style>
         """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY, 'deep': self.HOUSE_DEEP,
-               'gold': self.HOUSE_GOLD, 'bandgrad': self._band_gradient()}
+               'gold': self.HOUSE_GOLD}
         return css, band
 
     def abs_generate_html_report(self, df, title, period_desc, company_name=None,
@@ -2388,8 +2377,10 @@ class FinancialReport:
                    box-shadow:0 8px 24px rgba(0,0,0,.12); }
         /* No width:100%% - a block box already fills its containing block
            exactly, and stays right whatever padding the wrap later grows. */
+        /* No background here either - see .ngc-band. Solid cell colours only, so
+           the strip snaps to the same pixel column as the head and the foot. */
         .qr-band { display:table; table-layout:fixed; width:100%%; height:7px;
-                   border-collapse:collapse; background:%(bandgrad)s; }
+                   border-collapse:collapse; }
         .qr-band span { display:table-cell; height:7px; }
         /* Both bands close with a thin gold rule, matching the main reports:
            brand colours on top, navy body, gold at the lower boundary. */
@@ -2445,8 +2436,7 @@ class FinancialReport:
         .qr-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
         </style>
         """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY,
-               'deep': self.HOUSE_DEEP, 'gold': self.HOUSE_GOLD,
-               'bandgrad': self._band_gradient()}
+               'deep': self.HOUSE_DEEP, 'gold': self.HOUSE_GOLD}
 
         html = ("<html><head><meta charset='utf-8'>"
                 "<meta name='viewport' content='width=device-width, initial-scale=1'>"

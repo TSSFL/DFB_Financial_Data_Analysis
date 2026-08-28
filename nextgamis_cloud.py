@@ -1320,6 +1320,11 @@ class FinancialReport:
         'EXCESS', 'LOSS', 'EXCESS/LOSS', 'S/N',
     }
 
+    #Short labels: the summary block sits in the sticky first column, so its
+    #width is set by the longest label. "COLUMN TOTALS" forced that column wide
+    #enough to crowd out the data on a phone.
+    ABS_SUMMARY_LABELS = ('TOTALS', 'AVERAGE', 'MAXIMUM', 'MINIMUM')
+
     ABS_TEXT_FIELDS = ['MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
                        'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details',
                        'CREDIT Details', 'DEBIT Details', 'CREDIT PAID Details',
@@ -1654,7 +1659,7 @@ class FinancialReport:
 
     def abs_add_summary_rows(self, df, label_col):
         calc_df = df.copy()
-        exclude = ['COLUMN TOTALS', 'AVERAGE AMOUNT', 'MAXIMUM AMOUNT', 'MINIMUM AMOUNT']
+        exclude = list(self.ABS_SUMMARY_LABELS)
         calc_df = calc_df[~calc_df[label_col].isin(exclude)]
         if 'Name of Submitter' in calc_df.columns:
             calc_df = calc_df[~calc_df['Name of Submitter'].astype(str).str.startswith('COMBINED', na=False)]
@@ -1693,8 +1698,7 @@ class FinancialReport:
                 sums[col] = np.nan
 
         rows = []
-        for label, series in [('COLUMN TOTALS', sums), ('AVERAGE AMOUNT', avgs),
-                              ('MAXIMUM AMOUNT', maxs), ('MINIMUM AMOUNT', mins)]:
+        for label, series in zip(self.ABS_SUMMARY_LABELS, (sums, avgs, maxs, mins)):
             row = {c: '' for c in df.columns}
             for col in numeric_cols:
                 val = series.get(col)
@@ -1820,6 +1824,11 @@ class FinancialReport:
             text-align:center; color:#12386f; }
         table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
             text-align:left; min-width:174px; }
+        /* The date column only has to hold dd/mm/yyyy and the short summary
+           labels; the header wraps onto two lines rather than setting the width. */
+        table.ngc thead th:first-child { min-width:118px; max-width:150px; }
+        table.ngc tbody td:first-child { min-width:118px; max-width:150px;
+            white-space:nowrap; }
 
         .ngc-foot { background:%(deep)s; color:#c7d4e6; padding:18px 26px;
                     text-align:center; font-size:.88rem; line-height:1.6;
@@ -1837,6 +1846,9 @@ class FinancialReport:
             table.ngc { font-size:1.22rem; }
             table.ngc thead th { min-width:158px; padding:15px 13px; font-size:1.16rem;
                                  line-height:1.35; }
+            table.ngc thead th:first-child,
+            table.ngc tbody td:first-child { min-width:126px; max-width:150px;
+                                             padding-left:10px; padding-right:10px; }
             table.ngc tbody td { padding:15px 15px; line-height:1.55; }
             table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
                 min-width:190px; }
@@ -1886,7 +1898,7 @@ class FinancialReport:
         AMBER, RED, GREEN = '#E65100', '#C62828', '#1B5E20'
         date_col = 'Date of Transaction' if 'Date of Transaction' in fdf.columns else fdf.columns[0]
         multi_dates = fdf[fdf.duplicated(subset=[date_col], keep=False)][date_col].unique()
-        summary_labels = ['COLUMN TOTALS', 'AVERAGE AMOUNT', 'MAXIMUM AMOUNT', 'MINIMUM AMOUNT']
+        summary_labels = list(self.ABS_SUMMARY_LABELS)
 
         for i in fdf.index:
             sub = str(fdf.at[i, 'Name of Submitter']) if 'Name of Submitter' in fdf.columns else ''
@@ -2305,16 +2317,26 @@ class FinancialReport:
         .qr-head .co { color:%(gold)s; }
         .qr-head .sub { display:block; margin-top:6px; font-weight:400; font-size:.85rem;
                         color:#B9C6DC; }
-        table.qr { width:100%%; border-collapse:collapse; font-size:1rem; }
-        table.qr th { background:#2E7D32; color:#fff; padding:12px 10px; text-align:left;
+        table.qr { width:100%%; border-collapse:collapse; font-size:1.08rem;
+                   font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1; }
+        table.qr th { background:#2E7D32; color:#fff; padding:13px 11px; text-align:left;
+                      font-size:1.08rem; letter-spacing:.2px;
                       border-top:3px solid #DC143C; border-bottom:3px solid #DC143C; }
-        table.qr td { padding:11px 10px; border:1px solid #e0e0e0; vertical-align:top; }
+        table.qr td { padding:12px 11px; border:1px solid #dbe2ea; vertical-align:top;
+                      line-height:1.45; }
         td.sn { width:48px; text-align:center; color:#14356b; font-weight:700;
-                background:#f1f3f4; }
-        td.desc { width:34%%; font-weight:600; color:#0B2A5B; }
-        td.amt { width:20%%; text-align:right; white-space:nowrap; }
-        td.det { width:40%%; white-space:normal; word-wrap:break-word; line-height:1.35;
-                 color:#444; }
+                font-size:1.02rem; background:#eef2f7; }
+        td.desc { width:34%%; font-weight:700; color:#0B2A5B; font-size:1.06rem; }
+        /* The amount column carried no weight or colour of its own, so the
+           figures inherited regular weight while the descriptions beside them
+           were bold - the numbers read as the faintest thing on the page.
+           This is the one column people actually read, so it is now the
+           strongest: largest, boldest, darkest. */
+        td.amt { width:20%%; text-align:right; white-space:nowrap;
+                 font-size:1.16rem; font-weight:700; color:#0b1c33;
+                 letter-spacing:.2px; }
+        td.det { width:40%%; white-space:normal; word-wrap:break-word; line-height:1.4;
+                 color:#2b3646; font-size:1.02rem; }
         tr.zc td { background:#eef4ff; }
         tr.zb td.det { font-style:italic; }
         tr:hover td { background:#EADDCA; }

@@ -1738,6 +1738,26 @@ class FinancialReport:
             stops.append("{} {:.3f}%".format(c, b))
         return "linear-gradient(to right, " + ", ".join(stops) + ")"
 
+    def _band_html(self):
+        """The brand strip as six laid-out cells rather than six painted stops.
+
+        A gradient stop is a paint-time event with no layout box, so where it
+        lands is whatever the rasteriser makes of a fraction of a pixel. Under
+        display scaling the boundaries drift and the last stripe absorbs the
+        accumulated error - which is exactly what showed on screen: a long
+        first stripe and a short last one, six percent apart.
+
+        Six table cells are laid out, not painted. The engine sizes them from
+        table-layout:fixed and hands out the remainder a pixel at a time, so no
+        stripe is ever more than one pixel off its neighbours, at any width, in
+        any renderer. Table layout rather than flex because WeasyPrint lays out
+        tables but not flex - flex is what made the strip vanish from every PDF
+        to begin with. The gradient stays on as the cells' background, so the
+        strip still paints if a renderer ever ignores the cells.
+        """
+        return ''.join("<span style='background:%s'></span>" % c
+                       for c in self.HOUSE_BAND)
+
     def _abs_css(self):
         """NEXTGAMIS Cloud palette.
 
@@ -1750,7 +1770,7 @@ class FinancialReport:
         NEXTGAMIS ABS green + crimson. Cloud mirrors ABS in structure and logic,
         not in colour.
         """
-        band = ''   #the strip is painted by the .ngc-band rule below
+        band = self._band_html()   #six cells; .ngc-band below lays them out
         css = """
         <style>
         .ngc-body { font-family: %(font)s; background:#eceff3; margin:0;
@@ -1763,7 +1783,9 @@ class FinancialReport:
         .ngc-container { max-width:fit-content; margin:0 auto; border-radius:10px;
                          overflow:hidden; background:#fff;
                          box-shadow:0 10px 34px rgba(11,42,91,.20); }
-        .ngc-band { height:7px; width:100%%; background:%(bandgrad)s; }
+        .ngc-band { display:table; table-layout:fixed; width:100%%; height:7px;
+                    border-collapse:collapse; background:%(bandgrad)s; }
+        .ngc-band span { display:table-cell; height:7px; }
         /* Each band is closed by a thin gold rule: brand colours on top, navy
            body, gold at the lower boundary - header and footer mirror each other. */
         .ngc-head { background:%(navy)s; color:#fff; padding:20px 28px; text-align:center;
@@ -2301,7 +2323,7 @@ class FinancialReport:
 
         comp = (company_name or 'NEXTGAMIS CLOUD').upper()
         stamp = datetime.now().strftime('%d/%m/%Y at %H:%M:%S')
-        band = ''   #painted by the .qr-band rule below
+        band = self._band_html()   #six cells; .qr-band below lays them out
         css = """
         <style>
         @page { size: A4 portrait; margin: 14mm; }
@@ -2310,7 +2332,9 @@ class FinancialReport:
                    box-shadow:0 8px 24px rgba(0,0,0,.12); }
         /* No width:100%% - a block box already fills its containing block
            exactly, and stays right whatever padding the wrap later grows. */
-        .qr-band { height:7px; background:%(bandgrad)s; }
+        .qr-band { display:table; table-layout:fixed; width:100%%; height:7px;
+                   border-collapse:collapse; background:%(bandgrad)s; }
+        .qr-band span { display:table-cell; height:7px; }
         /* Both bands close with a thin gold rule, matching the main reports:
            brand colours on top, navy body, gold at the lower boundary. */
         .qr-head { background:%(navy)s; color:#fff; padding:18px 24px; text-align:center;
@@ -2354,6 +2378,14 @@ class FinancialReport:
         .qr-foot { background:%(deep)s; color:#c7d4e6; padding:16px 24px; text-align:center;
                    font-size:.86rem; line-height:1.6;
                    border-bottom:3px solid %(gold)s; }
+        /* The table needs ~471px of content before it stops shrinking, which is
+           wider than any phone in portrait - so without a scroller it pushed past
+           the card and the strips stopped short of the document width. Scrolling
+           it inside the card keeps the card authoritative: strips, head, table and
+           foot share one width at every viewport. Same pattern as .dataframe-div
+           in the main reports. Print is exempt - WeasyPrint would clip. */
+        .qr-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        @media print { .qr-scroll { overflow-x:visible; } }
         .qr-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
         </style>
         """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY,
@@ -2366,9 +2398,10 @@ class FinancialReport:
                 "<div class='qr-band'>{band}</div>"
                 "<div class='qr-head'>Quick Report for {date}"
                 "<span class='sub'>Generated for <span class='co'>{co}</span> on {stamp}</span></div>"
+                "<div class='qr-scroll'>"
                 "<table class='qr'><thead><tr><th>#</th><th>Description</th>"
                 "<th style='text-align:right'>Amount (TZS)</th><th>Details</th></tr></thead>"
-                "<tbody>{body}</tbody></table>"
+                "<tbody>{body}</tbody></table></div>"
                 "<div class='qr-band'>{band}</div>"
                 "<div class='qr-foot'>NEXTGAMIS Cloud &nbsp;|&nbsp; {co} &nbsp;|&nbsp; {stamp}<br>"
                 "Automated Agency Banking Reporting &copy; 2026 "

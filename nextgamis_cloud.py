@@ -2026,7 +2026,10 @@ class FinancialReport:
             fdf.drop(columns=drop, inplace=True)
         elif mode == 'monthly_comm':
             fdf['Date of Transaction'] = self._abs_parse_dates(fdf['Date of Transaction'])
-            fdf['Month Year'] = fdf['Date of Transaction'].dt.strftime('%B %Y')
+            #Group on a real month period, not on the formatted label. Grouping by
+            #the "%B %Y" string sorts it alphabetically - April 2025, April 2026,
+            #August 2025 ... - instead of earliest month to most recent.
+            fdf['Month Period'] = fdf['Date of Transaction'].dt.to_period('M')
             comm_cols = [c for c in fdf.columns if 'COMM' in c and 'TOTAL' not in c
                          and 'Details' not in c]
             prov_totals = [c for c in fdf.columns if any(
@@ -2036,8 +2039,12 @@ class FinancialReport:
                      'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
                      'TOTAL BANK COMMISSION']
             agg = [c for c in dict.fromkeys(comm_cols + prov_totals + grand) if c in fdf.columns]
-            res = fdf.groupby('Month Year')[agg + ['TOTAL COMMISSION']].sum().reset_index()
-            res.rename(columns={'Month Year': 'Date of Transaction'}, inplace=True)
+            res = fdf.groupby('Month Period')[agg + ['TOTAL COMMISSION']].sum().reset_index()
+            res = res.sort_values('Month Period').reset_index(drop=True)
+            res['Date of Transaction'] = res['Month Period'].dt.strftime('%B %Y')
+            res = res.drop(columns=['Month Period'])
+            res = res[['Date of Transaction'] + [c for c in res.columns
+                                                 if c != 'Date of Transaction']]
             res['S/N'] = range(1, len(res) + 1)
             return res
         elif mode == 'mini':
@@ -2134,17 +2141,25 @@ class FinancialReport:
 
     # ── Report 6: Daily Snapshot (single date) ────────────────────────────────
 
-    def daily_snapshot_report(self, date, company_name=None, output_file=None):
-        """Report 6 - every submission for one date, plus the COMBINED row."""
+    def daily_snapshot_report(self, date=None, company_name=None, output_file=None):
+        """Report 6 - every submission for one date, plus the COMBINED row.
+
+        With no date it reports on the current date, as Quick Report does.
+        """
         calc, _ = self._abs_calc_frame('all')
         if calc is None:
             print("[!] No transaction data available.")
             return None
-        target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
-        day = calc[self._abs_parse_dates(calc['Date of Transaction'])
-                   .dt.strftime('%d/%m/%Y') == target].copy()
+        #No date given means today - the report is for the day it is run on.
+        target = (datetime.now() if date is None
+                  else pd.to_datetime(date, dayfirst=True)).strftime('%d/%m/%Y')
+        parsed = self._abs_parse_dates(calc['Date of Transaction'])
+        day = calc[parsed.dt.strftime('%d/%m/%Y') == target].copy()
         if day.empty:
-            print("[!] No records found for {}.".format(target))
+            latest = parsed.max()
+            hint = ("" if pd.isna(latest) else
+                    "  Most recent date with data: {}.".format(latest.strftime('%d/%m/%Y')))
+            print("[!] No records found for {}.{}".format(target, hint))
             return None
         final = self.abs_consolidate_by_date(day, is_snapshot=True)
         desc = "for {}".format(target)
@@ -2158,7 +2173,7 @@ class FinancialReport:
 
     ABS_SPECIAL_DETAIL = {'MOBILE BUNDLES COMM and SHARES': 'MOBILE BUNDLES and SHARES Details'}
 
-    def quick_report(self, date, company_name=None, fmt='html', output_file=None):
+    def quick_report(self, date=None, company_name=None, fmt='html', output_file=None):
         """Report 7 - one date as # | Description | Amount (TZS) | Details.
 
         Zone A: numeric rows that are non-zero.  Zone B: non-empty free text.
@@ -2169,11 +2184,16 @@ class FinancialReport:
         if calc is None:
             print("[!] No transaction data available.")
             return None
-        target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
-        day = calc[self._abs_parse_dates(calc['Date of Transaction'])
-                   .dt.strftime('%d/%m/%Y') == target].copy()
+        #No date given means today - the report is for the day it is run on.
+        target = (datetime.now() if date is None
+                  else pd.to_datetime(date, dayfirst=True)).strftime('%d/%m/%Y')
+        parsed = self._abs_parse_dates(calc['Date of Transaction'])
+        day = calc[parsed.dt.strftime('%d/%m/%Y') == target].copy()
         if day.empty:
-            print("[!] No transaction data found for {}.".format(target))
+            latest = parsed.max()
+            hint = ("" if pd.isna(latest) else
+                    "  Most recent date with data: {}.".format(latest.strftime('%d/%m/%Y')))
+            print("[!] No transaction data for {}.{}".format(target, hint))
             return None
 
         final = self.abs_consolidate_by_date(day, is_snapshot=True)

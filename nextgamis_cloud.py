@@ -1580,17 +1580,26 @@ class FinancialReport:
             if base not in pools and base not in extra:
                 extra.append(base)
 
+        #One pass over the columns instead of two regex scans per provider. With
+        #60-odd providers and 100-odd columns the old form ran ~12,000 anchored
+        #matches per call; this runs one per column and only the highest index
+        #of each tier is ever read.
+        n_max, s_max = {}, {}
+        for c in cols:
+            m = re.match(r'^(.*?) (?:(SUPERAGENT) )?(\d+)$', c)
+            if m:
+                bucket = s_max if m.group(2) else n_max
+                base, idx = m.group(1), int(m.group(3))
+                if idx > bucket.get(base, -1):
+                    bucket[base] = idx
+
         g1 = ['Date of Submission', 'Name of Submitter', 'Date of Transaction']
         g2, g4 = [], []
 
         for key in pools + extra:
-            n_idx = sorted(int(m.group(1)) for m in
-                           (re.match(r'^' + re.escape(key) + r' (\d+)$', c) for c in cols) if m)
-            s_idx = sorted(int(m.group(1)) for m in
-                           (re.match(r'^' + re.escape(key) + r' SUPERAGENT (\d+)$', c) for c in cols) if m)
-            if not n_idx and not s_idx:
+            if key not in n_max and key not in s_max:
                 continue
-            n_cnt, sa_cnt = (max(n_idx) if n_idx else 0), (max(s_idx) if s_idx else 0)
+            n_cnt, sa_cnt = n_max.get(key, 0), s_max.get(key, 0)
             single_tier = 'LIPA' in key or 'AGENCY' in key
 
             for n in range(1, n_cnt + 1):
@@ -1729,35 +1738,38 @@ class FinancialReport:
         df['_dp'] = self._abs_parse_dates(df['Date of Transaction'])
         df = df.sort_values('_dp', na_position='last').reset_index(drop=True)
 
-        date_info = {}
-        for d, grp in df.groupby('_dp', sort=True, dropna=True):
-            date_info[d] = {
-                'last_idx':     grp.index[-1],
-                'total_actual': grp['ACTUAL OPERATING CAPITAL'].sum(),
-                'inflow':  (grp['TOTAL COMMISSION'].sum() + grp['CAPITAL INFUSION'].sum()
-                            + grp['CREDIT'].sum() + grp['DEBIT PAID'].sum()),
-                'outflow': (grp['TRANSFER FEES'].sum() + grp['SALARIES'].sum()
-                            + grp['EXPENDITURES'].sum() + grp['CREDIT PAID'].sum()
-                            + grp['DEBIT'].sum()),
-            }
-        dates_sorted = sorted(date_info.keys())
+        #One grouped aggregation rather than a Python loop that materialised a
+        #sub-frame per date and ran ten scalar Series.sum() calls on it - about
+        #5,500 reductions to fold 546 dates, then 2,000 scalar .at writes. The
+        #chain below is the same arithmetic over the same columns in the same
+        #order; only the loop is gone.
+        flow_in  = ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'CREDIT', 'DEBIT PAID']
+        flow_out = ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT PAID', 'DEBIT']
+        grouped = df.groupby('_dp', sort=True, dropna=True)
+        sums = grouped[['ACTUAL OPERATING CAPITAL'] + flow_in + flow_out].sum()
+
+        #df is already sorted by _dp with a fresh RangeIndex, so each date's rows
+        #are contiguous and the group's last label is the row the reconciliation
+        #is written onto - exactly what grp.index[-1] returned.
+        last_idx = pd.Series(df.index.to_numpy(), index=df.index).groupby(
+            df['_dp'], sort=True, dropna=True).last()
 
         for col in ['EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS', 'EXCESS', 'LOSS']:
             df[col] = 0.0
 
-        for j, d in enumerate(dates_sorted):
-            info = date_info[d]
-            if j == 0:
-                expected = info['total_actual']
-            else:
-                prev = date_info[dates_sorted[j - 1]]
-                expected = prev['total_actual'] + info['inflow'] - info['outflow']
-            el = info['total_actual'] - expected
-            last = info['last_idx']
-            df.at[last, 'EXPECTED OPERATING CAPITAL'] = expected
-            df.at[last, 'EXCESS/LOSS'] = el
-            df.at[last, 'EXCESS'] = el if el > 0 else 0.0
-            df.at[last, 'LOSS'] = abs(el) if el < 0 else 0.0
+        if len(sums):
+            total_actual = sums['ACTUAL OPERATING CAPITAL']
+            #The first date has nothing to chain from, so it reconciles to itself.
+            expected = total_actual.shift(1) + sums[flow_in].sum(axis=1) \
+                                             - sums[flow_out].sum(axis=1)
+            expected.iloc[0] = total_actual.iloc[0]
+            el = total_actual - expected
+
+            rows = last_idx.to_numpy()
+            df.loc[rows, 'EXPECTED OPERATING CAPITAL'] = expected.to_numpy()
+            df.loc[rows, 'EXCESS/LOSS'] = el.to_numpy()
+            df.loc[rows, 'EXCESS'] = np.where(el > 0, el, 0.0)
+            df.loc[rows, 'LOSS'] = np.where(el < 0, np.abs(el), 0.0)
 
         df['TOTAL CASH INFLOW']  = df['TOTAL COMMISSION'] + df['CAPITAL INFUSION'] + df['EXCESS']
         df['TOTAL CASH OUTFLOW'] = df['TRANSFER FEES'] + df['SALARIES'] + df['EXPENDITURES']
@@ -1771,10 +1783,15 @@ class FinancialReport:
         df['Date of Transaction'] = self._abs_parse_dates(
             df['Date of Transaction']).dt.strftime('%d/%m/%Y')
 
+        #iterrows() built a one-off object Series per row and to_dict() walked it
+        #again - two passes over every cell to produce dicts that to_dict('records')
+        #hands over in one vectorised call. Same dicts, same order.
+        df = df.reset_index(drop=True)
+        records = df.to_dict('records')
+
         final_rows = []
         for date, group in df.groupby('Date of Transaction', sort=False):
-            for _, row in group.iterrows():
-                final_rows.append(row.to_dict())
+            final_rows.extend(records[i] for i in group.index)
             if len(group) > 1:
                 summary = group.select_dtypes(include=[np.number]).sum().to_dict()
                 names = []
@@ -2017,6 +2034,37 @@ class FinancialReport:
                'gold': self.HOUSE_GOLD}
         return css, band
 
+    @staticmethod
+    def _html_table(fdf):
+        """Render the frame the way to_html would, without pandas' formatter.
+
+        By the time a frame reaches here every cell is already a formatted,
+        escaped string, but to_html still walks each column through the generic
+        array formatter - pprint_thing over half a million cells on the
+        comprehensive report - to produce markup a join can build directly.
+        Output is byte-identical to
+        to_html(index=False, border=0, classes='ngc', escape=False, na_rep='').
+        """
+        def cell(v):
+            #Two rules copied from pandas' _write_cell: the value is stripped,
+            #then every pair of spaces becomes non-breaking so HTML does not
+            #collapse it. Free-text columns here really do carry double spaces,
+            #so dropping this changes what the reader sees. NaN is the only
+            #non-string that survives the formatting pass, and na_rep='' is what
+            #to_html would have printed for it.
+            s = '' if v is None or v != v else str(v).strip()
+            return s.replace('  ', '&nbsp;&nbsp;')
+
+        head = ''.join('      <th>%s</th>\n' % cell(c) for c in fdf.columns)
+        body = ''.join('    <tr>\n'
+                       + ''.join('      <td>%s</td>\n' % cell(v) for v in row)
+                       + '    </tr>\n'
+                       for row in fdf.itertuples(index=False, name=None))
+        return ('<table class="dataframe ngc">\n  <thead>\n'
+                '    <tr style="text-align: right;">\n' + head
+                + '    </tr>\n  </thead>\n  <tbody>\n' + body
+                + '  </tbody>\n</table>')
+
     def abs_generate_html_report(self, df, title, period_desc, company_name=None,
                                  output_file=None):
         """ABS-styled HTML report: same formatting, colouring and column widths."""
@@ -2103,8 +2151,7 @@ class FinancialReport:
         #frame that is ~58,000 attributes, 22x slower and 6x larger than to_html,
         #and the inline styles override the stylesheet. Cell text is escaped above,
         #so escape=False here only lets our own colour spans through.
-        df_html = fdf.to_html(index=False, border=0, classes='ngc',
-                              escape=False, na_rep='')
+        df_html = self._html_table(fdf)
 
         css, band = self._abs_css()
         comp = (company_name or 'NEXTGAMIS CLOUD').upper()

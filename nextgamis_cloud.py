@@ -9,20 +9,20 @@
 #naming with backward compatibility for the legacy form headers, ABS
 #reconciliation maths, and ABS typography.
 
-import gspread
 import urllib.request
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
- 
-from pretty_html_table import build_table
-from weasyprint import CSS
-from weasyprint import HTML
-
-from koboextractor import KoboExtractor
 
 import regex as re
+
+#gspread, seaborn, matplotlib, pretty_html_table, weasyprint and koboextractor are
+#imported inside the handful of methods that use them, not here. Together they cost
+#0.9s and 143MB at import time, and not one of them sits on the path the ABS parity
+#reports take - so a SageCell run was paying for them on the way in, every time, for
+#code most runs never reach. weasyprint in particular is only needed when
+#quick_report is asked for a PDF; importing it there means the module now loads and
+#every HTML report still works on a machine where weasyprint is not installed at all.
+#(The unused `from weasyprint import CSS` is gone entirely.)
 
 from datetime import date, datetime, timezone, timedelta
 
@@ -32,8 +32,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class FinancialReport:
-    def __init__(self, data_source, spreadsheet_id =None, service_account_file=None, range_name=None, file_path=None, file_name=None, token=None, url=None, asset_index=None, prepare=True):
+    def __init__(self, data_source, spreadsheet_id =None, service_account_file=None, range_name=None, file_path=None, file_name=None, token=None, url=None, asset_index=None, prepare=False):
         self.data_source = data_source
+        self._df = None          #backs the lazy `df` property below
         if self.data_source == 'google_drive':
             self.spreadsheet_id = spreadsheet_id #Using spreadsheet id instead of key
             self.service_account_file = service_account_file
@@ -48,6 +49,7 @@ class FinancialReport:
             self.file_name = file_name
             self.data = self._get_data_from_dropbox()
         elif self.data_source == 'kobo':
+            from koboextractor import KoboExtractor
             self.kobo = KoboExtractor(token, url, debug=True)
             self.asset_index = asset_index
             self.asset_uid = None
@@ -58,16 +60,37 @@ class FinancialReport:
         #Untouched source frame, used by the NEXTGAMIS ABS parity reports
         self.raw_df = (self.df if self.data_source == 'kobo' else self.data).copy()
 
-        #Prepare the legacy frame but do NOT render: _full_report's HTML pass costs
-        #~10s and writes a ~9MB Full_DFB_Report.html that nobody asked for, on every
-        #instantiation. The legacy endpoints call _full_report('comp') etc. explicitly
-        #when they want output. prepare=False skips this entirely - use it when only
-        #the ABS parity reports (abs_report / daily_snapshot_report / quick_report)
-        #are needed, since those read self.raw_df and never touch self.df.
+        #The legacy frame is built on first use, not here - see the `df` property.
+        #prepare=True forces it now, for a caller that would rather pay the cost up
+        #front than on first access.
         if prepare:
-            self.df = self._full_report(render=False)
+            self.df
+
+    @property
+    def df(self):
+        """The legacy prepared frame, built on first use.
+
+        This used to be built eagerly in __init__, and prepare defaulted to True,
+        so every instantiation paid ~2.6s for it. Anyone running only the ABS
+        parity reports paid that in full for nothing: those read self.raw_df and
+        never touch this frame. It was the single largest fixed cost in a run -
+        larger than generating all seven reports.
+
+        The cost itself is real work (consolidate_transactions groups by date and
+        aggregates row by row, ~15M pandas calls on 546 rows), so it is deferred
+        rather than removed: whoever actually needs the legacy frame still pays,
+        once, on first access.
+        """
+        if self._df is None:
+            self._df = self._full_report(render=False)
+        return self._df
+
+    @df.setter
+    def df(self, value):
+        self._df = value
 
     def _get_data_from_google_drive(self):
+        import gspread
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
         #Define the scope
         scope = ['https://www.googleapis.com/auth/spreadsheets'] 
@@ -425,6 +448,7 @@ class FinancialReport:
             return ""
         
     def generate_html_table(self, df, output_file):
+        from pretty_html_table import build_table
         #Create custom CSS styles
         css_styles = """
         <style scoped>
@@ -1088,6 +1112,9 @@ class FinancialReport:
         self.generate_html_table(df, output_file)
 
     def graphs(self, date, report_type):
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from pretty_html_table import build_table
         #top_ten, lower_ten, full
         df = self.df
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%d/%m/%Y')
@@ -2445,6 +2472,10 @@ class FinancialReport:
         stem = stem[:-5] if stem.endswith('.html') else stem
         if fmt == 'pdf':
             try:
+                #Imported here, not at module scope: this is the only place weasyprint
+                #is needed, and an ImportError lands in the same except that already
+                #handles a broken PDF engine - so an HTML report still works without it.
+                from weasyprint import HTML
                 HTML(string=html).write_pdf(stem + '.pdf')
                 self._p("Quick Report (PDF) \u00b7 {}".format(target), done=True,
                         meta=self._size_time(stem + '.pdf', _t0))

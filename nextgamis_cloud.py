@@ -26,6 +26,9 @@ import regex as re
 
 from datetime import date, datetime, timezone, timedelta
 
+import os
+import sys
+import time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -1396,19 +1399,71 @@ class FinancialReport:
             if base not in pools:
                 unknown.add(base)
         if unknown:
-            print("[!] Providers not in the roster (totals still computed): "
-                  + ", ".join(sorted(unknown)))
+            self._warn("Providers not in the roster (totals still computed): "
+                       + ", ".join(sorted(unknown)))
         return df
 
     # ── Progress reporting ────────────────────────────────────────────────────
 
     ABS_VERBOSE = True
 
+    #Colour is opt-out, not opt-in. 'auto' gives ANSI to a real terminal and clean
+    #text to everything else - a notebook, a SageCell, a redirected log - because a
+    #client that does not interpret the escapes prints them as visible junk. Set
+    #FinancialReport.ABS_COLOR = True to force colour on, False to force it off.
+    ABS_COLOR = 'auto'
+
+    _ANSI = {'ok': '\033[1;32m', 'name': '\033[1;36m', 'dim': '\033[2m',
+             'warn': '\033[1;33m', 'z': '\033[0m'}
+    _PLAIN = {k: '' for k in _ANSI}
+
     @classmethod
-    def _p(cls, msg, done=False):
-        """One progress line per real step, so a long run shows where it is."""
-        if cls.ABS_VERBOSE:
-            print(("  [OK] " if done else "  ... ") + msg, flush=True)
+    def _palette(cls):
+        """The escape codes to use, or six empty strings when colour is off."""
+        if cls.ABS_COLOR != 'auto':
+            return cls._ANSI if cls.ABS_COLOR else cls._PLAIN
+        try:
+            return cls._ANSI if sys.stdout.isatty() else cls._PLAIN
+        except Exception:      #a stdout with no isatty at all
+            return cls._PLAIN
+
+    @classmethod
+    def _p(cls, msg, done=False, meta=None):
+        """One progress line per real step, so a long run shows where it is.
+
+        Output paths are deliberately not printed. They are long enough to wrap,
+        and a wrapped line pushes the part worth reading - what was built, over
+        what period, how many rows - off the left of the screen. Every report
+        method returns its path, so nothing is lost by leaving it out.
+
+        `meta` is the trailing (size, time) note, dimmed so the eye lands on the
+        report name first.
+        """
+        if not cls.ABS_VERBOSE:
+            return
+        c = cls._palette()
+        tag = (c['ok'] + '[OK]') if done else (c['dim'] + '...')
+        #The leading segment of a completion line is the report name; lifting it
+        #makes a run of finished reports scannable straight down the left edge.
+        if done and ' \u00b7 ' in msg:
+            head, rest = msg.split(' \u00b7 ', 1)
+            msg = c['name'] + head + c['z'] + ' \u00b7 ' + rest
+        line = '  ' + tag + c['z'] + ' ' + msg
+        if meta:
+            line += '  ' + c['dim'] + meta + c['z']
+        print(line, flush=True)
+
+    @classmethod
+    def _warn(cls, msg):
+        """Same channel as _p, one column narrower, amber."""
+        c = cls._palette()
+        print('  ' + c['warn'] + '[!]' + c['z'] + ' ' + msg, flush=True)
+
+    @classmethod
+    def _size_time(cls, path, t0):
+        """The trailing note every completion line carries."""
+        mb = os.path.getsize(path) / 1048576.0 if os.path.exists(path) else 0
+        return "({:.1f} MB, {:.1f}s)".format(mb, time.time() - t0)
 
     # ── Master column order (ABS get_dynamic_columns, derived from the data) ───
 
@@ -2037,7 +2092,7 @@ class FinancialReport:
         base = self.normalise_columns(self.raw_df.copy())
         filtered, desc = self._abs_filter_period(base, period, year, start, end)
         if filtered.empty:
-            print("[!] No transaction data for {}.".format(desc))
+            self._warn("No transaction data for {}.".format(desc))
             return None
         calc = self.abs_run_calculations(filtered)
         final = self.abs_consolidate_by_date(calc)
@@ -2140,17 +2195,16 @@ class FinancialReport:
             report.abs_report(4, period='range',
                               start='01/11/2024', end='30/11/2024')
         """
-        import os, time
         _t0 = time.time()
         if number not in self.ABS_REPORTS:
-            print("[!] Report {} is not one of 1-5. Use daily_snapshot_report() for 6 "
-                  "or quick_report() for 7.".format(number))
+            self._warn("Report {} is not one of 1-5. Use daily_snapshot_report() "
+                       "for 6 or quick_report() for 7.".format(number))
             return None
         title, mode, slug_base = self.ABS_REPORTS[number]
 
         calc, desc = self._abs_calc_frame(period, year, start, end)
         if calc is None:
-            print("[!] No transaction data for {}.".format(desc))
+            self._warn("No transaction data for {}.".format(desc))
             return None
 
         if mode == 'monthly_comm':
@@ -2163,9 +2217,8 @@ class FinancialReport:
         out = output_file or self._abs_outfile(slug_base, desc, company_name)
         self.abs_generate_html_report(final, title, desc,
                                       company_name=company_name, output_file=out)
-        _mb = os.path.getsize(out) / 1048576.0 if os.path.exists(out) else 0
-        self._p("{} \u00b7 {} \u00b7 {} rows \u2192 {}  ({:.1f} MB, {:.1f}s)".format(
-            title, desc, len(final), out, _mb, time.time() - _t0), done=True)
+        self._p("{} \u00b7 {} \u00b7 {} rows".format(title, desc, len(final)),
+                done=True, meta=self._size_time(out, _t0))
         return out
 
     def _abs_outfile(self, slug_base, desc, company_name):
@@ -2186,7 +2239,7 @@ class FinancialReport:
         if date is None:
             latest = parsed.max()
             if pd.isna(latest):
-                print("[!] No transaction data available.")
+                self._warn("No transaction data available.")
                 return None, None
             target = latest.strftime('%d/%m/%Y')
         else:
@@ -2194,7 +2247,7 @@ class FinancialReport:
 
         day = calc[parsed.dt.strftime('%d/%m/%Y') == target].copy()
         if day.empty:
-            print("[!] No transaction data for {}.".format(target))
+            self._warn("No transaction data for {}.".format(target))
             return target, None
         return target, day
 
@@ -2203,9 +2256,10 @@ class FinancialReport:
 
         With no date it reports on the latest date that holds data.
         """
+        _t0 = time.time()
         calc, _ = self._abs_calc_frame('all')
         if calc is None:
-            print("[!] No transaction data available.")
+            self._warn("No transaction data available.")
             return None
         target, day = self._abs_pick_date(calc, date)
         if day is None:
@@ -2215,7 +2269,8 @@ class FinancialReport:
         out = output_file or self._abs_outfile('Daily_Snapshot', target.replace('/', '-'), company_name)
         self.abs_generate_html_report(final, 'Daily Snapshot', desc,
                                       company_name=company_name, output_file=out)
-        self._p("Daily Snapshot \u00b7 {} \u00b7 {} rows \u2192 {}".format(target, len(final), out), done=True)
+        self._p("Daily Snapshot \u00b7 {} \u00b7 {} rows".format(target, len(final)),
+                done=True, meta=self._size_time(out, _t0))
         return out
 
     # ── Report 7: Quick Report (single date, 4 columns) ───────────────────────
@@ -2230,9 +2285,10 @@ class FinancialReport:
         Zone C: the balance rows, always shown even when zero.
         fmt='pdf' renders A4 portrait via WeasyPrint, falling back to HTML.
         """
+        _t0 = time.time()
         calc, _ = self._abs_calc_frame('all')
         if calc is None:
-            print("[!] No transaction data available.")
+            self._warn("No transaction data available.")
             return None
         #No date given means today, falling back to the most recent date that has
         #data when today's submission is not in yet. An explicitly requested date is
@@ -2415,12 +2471,14 @@ class FinancialReport:
         if fmt == 'pdf':
             try:
                 HTML(string=html).write_pdf(stem + '.pdf')
-                self._p("Quick Report (PDF) \u00b7 {} \u2192 {}.pdf".format(target, stem), done=True)
+                self._p("Quick Report (PDF) \u00b7 {}".format(target), done=True,
+                        meta=self._size_time(stem + '.pdf', _t0))
                 return stem + '.pdf'
             except Exception as e:
-                print("[!] PDF engine unavailable ({}) - saving HTML instead.".format(e))
+                self._warn("PDF engine unavailable ({}) - saving HTML instead.".format(e))
         with open(stem + '.html', 'w', encoding='utf-8') as f:
             f.write(html)
-        self._p("Quick Report (HTML) \u00b7 {} \u2192 {}.html".format(target, stem), done=True)
+        self._p("Quick Report (HTML) \u00b7 {}".format(target), done=True,
+                meta=self._size_time(stem + '.html', _t0))
         return stem + '.html'
 

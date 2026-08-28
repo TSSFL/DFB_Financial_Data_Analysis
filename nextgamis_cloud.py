@@ -58,7 +58,17 @@ class FinancialReport:
             self.df = self._get_data_from_kobo()
     
         #Untouched source frame, used by the NEXTGAMIS ABS parity reports
-        self.raw_df = (self.df if self.data_source == 'kobo' else self.data).copy()
+        #Every source gets the same date normalisation. It used to live inside
+        #_get_data_from_dropbox alone, so a local CSV, a Google Sheet or a Kobo asset
+        #arrived carrying raw JavaScript date strings and every ABS report then said
+        #"No transaction data" - same data, same code, silent empty output, decided
+        #only by where the file came from.
+        source = self.df if self.data_source == 'kobo' else getattr(self, 'data', None)
+        if source is not None:
+            self._normalise_source_dates(source)
+
+        #Untouched source frame, used by the NEXTGAMIS ABS parity reports
+        self.raw_df = source.copy()
 
         #The legacy frame is built on first use, not here - see the `df` property.
         #prepare=True forces it now, for a caller that would rather pay the cost up
@@ -89,6 +99,40 @@ class FinancialReport:
     def df(self, value):
         self._df = value
 
+    #The form emits JavaScript Date strings - 'Fri Nov 01 2024 00:00:00 GMT+0300
+    #(East Africa Time)'. Everything downstream expects MM/DD/YYYY.
+    _JS_DATE_TAIL = r'GMT[+-]\d{4}.*'
+    _JS_DATE_FMT = '%a %b %d %Y %H:%M:%S'
+    _DATE_COLS = (('Timestamp', '%m/%d/%Y %H:%M:%S'),
+                  ('Date of Transaction', '%m/%d/%Y'))
+
+    @classmethod
+    def _normalise_source_dates(cls, df):
+        """Put the date columns into the format the rest of the class expects.
+
+        Called once from __init__ for every data source. It is deliberately
+        forgiving, because it now runs on input that may never have carried the
+        JavaScript form at all:
+
+        - a column that holds no 'GMT' marker is left untouched, so a CSV that was
+          already normalised passes straight through and the function is safe to
+          run twice;
+        - a row that fails to parse keeps its original text rather than becoming
+          NaT. The old dropbox-only version parsed without errors='coerce', so one
+          malformed row raised and the whole load died; a row that cannot be read
+          is now simply left for the period filter to drop.
+        """
+        for col, out_fmt in cls._DATE_COLS:
+            if col not in df.columns:
+                continue
+            text = df[col].astype(str)
+            if not text.str.contains('GMT', na=False).any():
+                continue
+            stripped = text.str.replace(cls._JS_DATE_TAIL, '', regex=True).str.strip()
+            parsed = pd.to_datetime(stripped, format=cls._JS_DATE_FMT, errors='coerce')
+            df[col] = parsed.dt.strftime(out_fmt).fillna(text)
+        return df
+
     def _get_data_from_google_drive(self):
         import gspread
         urllib.request.urlretrieve(self.service_account_file, "agency_banking.json")
@@ -113,17 +157,8 @@ class FinancialReport:
         url = self.file_url
         urllib.request.urlretrieve(url, self.file_name)
         df = pd.read_csv(self.file_name)
-        
-        #Remove timezone information (everything after 'GMT+0300') from both columns
-        df['Timestamp'] = df['Timestamp'].str.replace(r'GMT[+-]\d{4}.*', '', regex=True).str.strip()
-        df['Date of Transaction'] = df['Date of Transaction'].str.replace(r'GMT[+-]\d{4}.*', '', regex=True).str.strip()
-
-        #Convert 'Timestamp' to MM/DD/YYYY HH:MM:SS format
-        df['Timestamp'] = pd.to_datetime(df['Timestamp'], format='%a %b %d %Y %H:%M:%S', dayfirst=False).dt.strftime('%m/%d/%Y %H:%M:%S')
-
-        #Convert 'Date of Transaction' to MM/DD/YYYY format
-        df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%a %b %d %Y %H:%M:%S', dayfirst=False).dt.strftime('%m/%d/%Y')
-        
+        #Date normalisation used to happen here, and only here. It is now applied to
+        #every source from __init__ - see _normalise_source_dates.
         self._p("Data loaded: {} rows, {} columns".format(len(df), len(df.columns)), done=True)
         return df
         
@@ -259,36 +294,81 @@ class FinancialReport:
 
         return df_result
     
-    def consolidate_transactions(self, df): #Consolidates string values 
+    #Columns whose values are joined rather than summed or taken from one row.
+    _CT_TEXT_KEYS = ('Details', 'INCIDENTS', 'DAY NAME')
+
+    def consolidate_transactions(self, df): #Consolidates string values
+        """One row per transaction date: numbers summed, free text joined with '; '.
+
+        Vectorised. This was a groupby().apply() over a function that walked every
+        column of every group and called Series.sum() on each one - roughly 15
+        million pandas calls to fold 546 rows, and five of the six seconds the
+        legacy frame took to build. The same work is now done one column at a time
+        across all groups at once, which is the shape pandas is fast at.
+
+        The original's quirks are preserved deliberately, because the legacy
+        reports are built on top of them:
+
+        - A missing 'Name of Submitter' joins as the literal string 'nan'. The
+          original mapped str over the split result, so NaN became 'nan' before
+          the dropna() behind it could ever see it.
+        - 'Timestamp' takes the group's LAST row in file order, not its latest
+          time. Every other unhandled column takes the group's FIRST row.
+        - Blank and missing text is dropped from a join, so a group with nothing
+          to say joins to '' rather than to '; ; '.
+
+        One behaviour is not preserved, because it could not be: where a group's
+        last Timestamp is missing, the original called strftime on NaT, which
+        raises ValueError. This returns NaN for that row instead. No input the
+        original survived can reach that path, so nothing that worked changes.
+        """
         #Convert 'Date of Transaction' and 'Timestamp' to datetime objects
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'])
         df['Timestamp'] = pd.to_datetime(df['Timestamp'])
 
-        #Group by 'Date of Transaction'
-        grouped = df.groupby('Date of Transaction')
+        key = 'Date of Transaction'
+        grouped = df.groupby(key, sort=True)
+        keys = df[key]
 
-        #Function to aggregate rows within a group
-        def aggregate_rows(group):
-            first_row = group.iloc[0].copy()  #Start with the first row's values
+        #First and last row of each group by position, not by value: groupby.first()
+        #and .last() skip missing values, where the original's .iloc[0] / .iloc[-1]
+        #did not. cumcount is used rather than head(1).index so a duplicated frame
+        #index cannot pull in extra rows. Rows whose date is missing get NaN from
+        #cumcount and fall out of both masks, matching groupby's own dropna.
+        first_mask = grouped.cumcount() == 0
+        last_mask = grouped.cumcount(ascending=False) == 0
 
-            #Special handling for specific columns
-            for col in group.columns:
-                if any(keyword in col for keyword in ['Details', 'INCIDENTS', 'DAY NAME']):
-                    non_empty_strings = [s for s in group[col].astype(str).fillna('') if s.strip()] #ignore empty and missing strings
-                    first_row[col] = '; '.join(non_empty_strings) if non_empty_strings else '' #Avoid ; when the list is empty or has empty string
-                elif col == 'Name of Submitter':
-                    first_row[col] = '; '.join(group[col].str.split().str[0].map(str).dropna()) #Map to string type to handle mixed types correctly
-                elif col == 'Timestamp':
-                   first_row[col] = group[col].iloc[-1].strftime('%m/%d/%Y %H:%M:%S') #Take the last time -1, first time - 0
-                elif pd.api.types.is_numeric_dtype(group[col]):
-                    first_row[col] = group[col].sum()
+        #Start from each group's first row, then overwrite the columns that
+        #aggregate. Sorted by date, as grouped.apply() returned them.
+        out = df[first_mask].set_index(key).sort_index()
 
-            return first_row
-            
-        #Apply the aggregation function and reset the index
-        #groupby.apply no longer passes the grouping column to the function, so bring
-        #'Date of Transaction' back from the index and restore the original column order
-        consolidated_df = grouped.apply(aggregate_rows).reset_index()
+        text_cols = [c for c in df.columns
+                     if any(k in c for k in self._CT_TEXT_KEYS)]
+        num_cols = [c for c in df.columns
+                    if c != key and c != 'Timestamp' and c != 'Name of Submitter'
+                    and c not in text_cols and pd.api.types.is_numeric_dtype(df[c])]
+
+        if num_cols:
+            out[num_cols] = grouped[num_cols].sum()
+
+        for col in text_cols:
+            s = df[col].astype(str).fillna('')
+            keep = s.str.strip() != ''
+            joined = s[keep].groupby(keys[keep], sort=True).agg('; '.join)
+            #A group with no text at all is absent from `joined`, and joins to ''.
+            out[col] = joined.reindex(out.index).fillna('')
+
+        if 'Name of Submitter' in df.columns:
+            firsts = df['Name of Submitter'].str.split().str[0].map(str)
+            out['Name of Submitter'] = (firsts.groupby(keys, sort=True)
+                                        .agg('; '.join).reindex(out.index))
+
+        if 'Timestamp' in df.columns:
+            last = df[last_mask].set_index(key)['Timestamp'].sort_index()
+            out['Timestamp'] = last.reindex(out.index).dt.strftime('%m/%d/%Y %H:%M:%S')
+
+        #Bring the date back out of the index and restore the original column order
+        consolidated_df = out.reset_index()
         consolidated_df = consolidated_df.reindex(columns=df.columns).reset_index(drop=True)
         return consolidated_df
         

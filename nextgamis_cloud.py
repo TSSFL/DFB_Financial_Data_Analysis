@@ -1384,8 +1384,8 @@ class FinancialReport:
         before = list(df.columns)
         df = df.rename(columns={c: self.normalise_column(c) for c in df.columns})
         renamed = sum(1 for a, b in zip(before, df.columns) if a != b)
-        self._p("Columns normalised to ABS naming: {} columns, {} renamed"
-                .format(len(df.columns), renamed))
+        self._p("Columns normalised to ABS naming",
+                sub="{} columns, {} renamed".format(len(df.columns), renamed))
         #ABS calls the submission stamp 'Date of Submission'; the forms emit 'Timestamp'.
         if 'Timestamp' in df.columns and 'Date of Submission' not in df.columns:
             df = df.rename(columns={'Timestamp': 'Date of Submission'})
@@ -1427,8 +1427,13 @@ class FinancialReport:
         except Exception:      #a stdout with no isatty at all
             return cls._PLAIN
 
+    #Continuation marker for a sub-line. Six spaces put it directly under the
+    #first letter of the headline above it, so the detail reads as belonging to
+    #that step rather than as a step of its own.
+    _SUB = '      \u2514 '
+
     @classmethod
-    def _p(cls, msg, done=False, meta=None):
+    def _p(cls, msg, done=False, meta=None, sub=None):
         """One progress line per real step, so a long run shows where it is.
 
         Output paths are deliberately not printed. They are long enough to wrap,
@@ -1437,7 +1442,10 @@ class FinancialReport:
         method returns its path, so nothing is lost by leaving it out.
 
         `meta` is the trailing (size, time) note, dimmed so the eye lands on the
-        report name first.
+        report name first. `sub` is one detail line, or a list of them, printed
+        under the headline: a step that both names what it did and quantifies it
+        is two facts, and two facts on one line is where these started to run
+        long enough to wrap.
         """
         if not cls.ABS_VERBOSE:
             return
@@ -1452,6 +1460,8 @@ class FinancialReport:
         if meta:
             line += '  ' + c['dim'] + meta + c['z']
         print(line, flush=True)
+        for s in ([sub] if isinstance(sub, str) else (sub or [])):
+            print(c['dim'] + cls._SUB + s + c['z'], flush=True)
 
     @classmethod
     def _warn(cls, msg):
@@ -2168,10 +2178,10 @@ class FinancialReport:
             if filtered.empty:
                 cache[key] = (None, desc)
             else:
-                self._p("{}: {} submissions across {} date(s); totals and "
-                        "reconciliation computed".format(
+                self._p("{}: {} submissions across {} date(s)".format(
                             desc, len(filtered),
-                            filtered['Date of Transaction'].dt.date.nunique()))
+                            filtered['Date of Transaction'].dt.date.nunique()),
+                        sub="Totals and reconciliation computed")
                 cache[key] = (self.abs_run_calculations(filtered), desc)
         return cache[key]
 

@@ -27,7 +27,6 @@ import regex as re
 from datetime import date, datetime, timezone, timedelta
 
 import os
-import sys
 import time
 import warnings
 warnings.filterwarnings('ignore')
@@ -1407,26 +1406,6 @@ class FinancialReport:
 
     ABS_VERBOSE = True
 
-    #Colour is opt-out, not opt-in. 'auto' gives ANSI to a real terminal and clean
-    #text to everything else - a notebook, a SageCell, a redirected log - because a
-    #client that does not interpret the escapes prints them as visible junk. Set
-    #FinancialReport.ABS_COLOR = True to force colour on, False to force it off.
-    ABS_COLOR = 'auto'
-
-    _ANSI = {'ok': '\033[1;32m', 'name': '\033[1;36m', 'dim': '\033[2m',
-             'warn': '\033[1;33m', 'z': '\033[0m'}
-    _PLAIN = {k: '' for k in _ANSI}
-
-    @classmethod
-    def _palette(cls):
-        """The escape codes to use, or six empty strings when colour is off."""
-        if cls.ABS_COLOR != 'auto':
-            return cls._ANSI if cls.ABS_COLOR else cls._PLAIN
-        try:
-            return cls._ANSI if sys.stdout.isatty() else cls._PLAIN
-        except Exception:      #a stdout with no isatty at all
-            return cls._PLAIN
-
     #Continuation marker for a sub-line. Six spaces put it directly under the
     #first letter of the headline above it, so the detail reads as belonging to
     #that step rather than as a step of its own.
@@ -1436,38 +1415,34 @@ class FinancialReport:
     def _p(cls, msg, done=False, meta=None, sub=None):
         """One progress line per real step, so a long run shows where it is.
 
+        Plain text only. ANSI colour was tried and taken out: SageCell is where
+        this runs, and it does not interpret the escapes - it prints them, so a
+        green [OK] arrives as a literal [1;32m[OK][0m. Structure carries the
+        weight instead: the [OK]/... column, the indent, and the sub-line.
+
         Output paths are deliberately not printed. They are long enough to wrap,
         and a wrapped line pushes the part worth reading - what was built, over
         what period, how many rows - off the left of the screen. Every report
         method returns its path, so nothing is lost by leaving it out.
 
-        `meta` is the trailing (size, time) note, dimmed so the eye lands on the
-        report name first. `sub` is one detail line, or a list of them, printed
-        under the headline: a step that both names what it did and quantifies it
-        is two facts, and two facts on one line is where these started to run
-        long enough to wrap.
+        `meta` is the trailing (size, time) note. `sub` is one detail line, or a
+        list of them, printed under the headline: a step that both names what it
+        did and quantifies it is two facts, and two facts on one line is where
+        these started to run long enough to wrap.
         """
         if not cls.ABS_VERBOSE:
             return
-        c = cls._palette()
-        tag = (c['ok'] + '[OK]') if done else (c['dim'] + '...')
-        #The leading segment of a completion line is the report name; lifting it
-        #makes a run of finished reports scannable straight down the left edge.
-        if done and ' \u00b7 ' in msg:
-            head, rest = msg.split(' \u00b7 ', 1)
-            msg = c['name'] + head + c['z'] + ' \u00b7 ' + rest
-        line = '  ' + tag + c['z'] + ' ' + msg
+        line = ('  [OK] ' if done else '  ... ') + msg
         if meta:
-            line += '  ' + c['dim'] + meta + c['z']
+            line += '  ' + meta
         print(line, flush=True)
         for s in ([sub] if isinstance(sub, str) else (sub or [])):
-            print(c['dim'] + cls._SUB + s + c['z'], flush=True)
+            print(cls._SUB + s, flush=True)
 
     @classmethod
     def _warn(cls, msg):
-        """Same channel as _p, one column narrower, amber."""
-        c = cls._palette()
-        print('  ' + c['warn'] + '[!]' + c['z'] + ' ' + msg, flush=True)
+        """Same channel as _p, one column narrower."""
+        print('  [!] ' + msg, flush=True)
 
     @classmethod
     def _size_time(cls, path, t0):

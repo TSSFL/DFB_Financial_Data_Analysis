@@ -2141,25 +2141,40 @@ class FinancialReport:
 
     # ── Report 6: Daily Snapshot (single date) ────────────────────────────────
 
+    def _abs_pick_date(self, calc, date):
+        """Resolve the date a single-date report should cover.
+
+        date=None  -> the latest date that holds data.
+        date given -> exactly that date, never substituted.
+        Returns (dd/mm/yyyy, rows), or (target, None) when there is nothing to show.
+        """
+        parsed = self._abs_parse_dates(calc['Date of Transaction'])
+        if date is None:
+            latest = parsed.max()
+            if pd.isna(latest):
+                print("[!] No transaction data available.")
+                return None, None
+            target = latest.strftime('%d/%m/%Y')
+        else:
+            target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
+
+        day = calc[parsed.dt.strftime('%d/%m/%Y') == target].copy()
+        if day.empty:
+            print("[!] No transaction data for {}.".format(target))
+            return target, None
+        return target, day
+
     def daily_snapshot_report(self, date=None, company_name=None, output_file=None):
         """Report 6 - every submission for one date, plus the COMBINED row.
 
-        With no date it reports on the current date, as Quick Report does.
+        With no date it reports on the latest date that holds data.
         """
         calc, _ = self._abs_calc_frame('all')
         if calc is None:
             print("[!] No transaction data available.")
             return None
-        #No date given means today - the report is for the day it is run on.
-        target = (datetime.now() if date is None
-                  else pd.to_datetime(date, dayfirst=True)).strftime('%d/%m/%Y')
-        parsed = self._abs_parse_dates(calc['Date of Transaction'])
-        day = calc[parsed.dt.strftime('%d/%m/%Y') == target].copy()
-        if day.empty:
-            latest = parsed.max()
-            hint = ("" if pd.isna(latest) else
-                    "  Most recent date with data: {}.".format(latest.strftime('%d/%m/%Y')))
-            print("[!] No records found for {}.{}".format(target, hint))
+        target, day = self._abs_pick_date(calc, date)
+        if day is None:
             return None
         final = self.abs_consolidate_by_date(day, is_snapshot=True)
         desc = "for {}".format(target)
@@ -2176,6 +2191,7 @@ class FinancialReport:
     def quick_report(self, date=None, company_name=None, fmt='html', output_file=None):
         """Report 7 - one date as # | Description | Amount (TZS) | Details.
 
+        With no date it reports on the latest date that holds data.
         Zone A: numeric rows that are non-zero.  Zone B: non-empty free text.
         Zone C: the balance rows, always shown even when zero.
         fmt='pdf' renders A4 portrait via WeasyPrint, falling back to HTML.
@@ -2184,16 +2200,11 @@ class FinancialReport:
         if calc is None:
             print("[!] No transaction data available.")
             return None
-        #No date given means today - the report is for the day it is run on.
-        target = (datetime.now() if date is None
-                  else pd.to_datetime(date, dayfirst=True)).strftime('%d/%m/%Y')
-        parsed = self._abs_parse_dates(calc['Date of Transaction'])
-        day = calc[parsed.dt.strftime('%d/%m/%Y') == target].copy()
-        if day.empty:
-            latest = parsed.max()
-            hint = ("" if pd.isna(latest) else
-                    "  Most recent date with data: {}.".format(latest.strftime('%d/%m/%Y')))
-            print("[!] No transaction data for {}.{}".format(target, hint))
+        #No date given means today, falling back to the most recent date that has
+        #data when today's submission is not in yet. An explicitly requested date is
+        #never substituted - the caller asked for that day and gets it or nothing.
+        target, day = self._abs_pick_date(calc, date)
+        if day is None:
             return None
 
         final = self.abs_consolidate_by_date(day, is_snapshot=True)

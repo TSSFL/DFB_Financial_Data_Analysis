@@ -2177,9 +2177,7 @@ class FinancialReport:
             return None
         calc = self.abs_run_calculations(filtered)
         final = self.abs_consolidate_by_date(calc)
-        slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
-        out = output_file or "{}_Comprehensive_Report_{}_{}.html".format(
-            slug, desc.replace(' ', '_'), datetime.now().strftime('%d%m%Y_%H%M%S'))
+        out = output_file or self._abs_outfile('Comprehensive_Report', desc, company_name)
         self.abs_generate_html_report(final, 'Comprehensive Report', desc,
                                       company_name=company_name, output_file=out)
         print("[OK] Report saved -> {}".format(out))
@@ -2303,9 +2301,25 @@ class FinancialReport:
         return out
 
     def _abs_outfile(self, slug_base, desc, company_name):
+        """Build the filename: <Company>-<Report>_<Scope>-DD_MM_YYYY-HH_MM_SS.html
+
+        Dashes separate the fields, underscores live inside them, so the
+        date and the clock each read as a date and a clock instead of running
+        together into one fourteen-digit block.
+
+        Single-date reports otherwise carry their date twice - once as the
+        scope, once as the generation stamp. When the two fall on the same day
+        the scope is dropped rather than repeated; a scope covering some other
+        day is kept, because then it says something the stamp does not.
+        """
+        now = datetime.now()
         slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
-        return "{}_{}_{}_{}.html".format(slug, slug_base, desc.replace(' ', '_'),
-                                         datetime.now().strftime('%d%m%Y_%H%M%S'))
+        scope = desc.replace(' ', '_')
+        if re.sub(r'\D', '', scope) == now.strftime('%d%m%Y'):
+            scope = ''       #single-date report for today - the stamp already says so
+        return "{}-{}{}-{}.html".format(slug, slug_base,
+                                        '_' + scope if scope else '',
+                                        now.strftime('%d_%m_%Y-%H_%M_%S'))
 
     # ── Report 6: Daily Snapshot (single date) ────────────────────────────────
 

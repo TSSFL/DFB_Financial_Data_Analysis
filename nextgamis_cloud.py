@@ -84,14 +84,7 @@ class FinancialReport:
         return data
         
     def _get_data_from_dropbox(self):
-        print(
-        "🌟 Welcome to TSSFL Technology Stack! 🚀\n"
-        "Your financial data is being processed\n"
-        "with precision and speed. \n" 
-        "This process will only take a few seconds.\n"
-         "Please wait...📊✨\n"
-        "")
-        print("Fetching data...")
+        self._p("Fetching data from Dropbox ...")
         url = self.file_url
         urllib.request.urlretrieve(url, self.file_name)
         df = pd.read_csv(self.file_name)
@@ -106,7 +99,7 @@ class FinancialReport:
         #Convert 'Date of Transaction' to MM/DD/YYYY format
         df['Date of Transaction'] = pd.to_datetime(df['Date of Transaction'], format='%a %b %d %Y %H:%M:%S', dayfirst=False).dt.strftime('%m/%d/%Y')
         
-        print("Data fetched successfully from source. \n")
+        self._p("Data loaded: {} rows, {} columns".format(len(df), len(df.columns)), done=True)
         return df
         
     def _get_data_from_kobo(self):
@@ -1724,6 +1717,23 @@ class FinancialReport:
     #fetch, which a sandboxed SageMath Cell page cannot rely on.
     ABS_FONT = "'Liberation Sans', Arial, Helvetica, sans-serif"
 
+    def _band_gradient(self):
+        """The brand strip as a single linear-gradient with hard stops.
+
+        It used to be flex children with flex:1 each. That lays out in a browser
+        but WeasyPrint does not lay out flex, so the strip vanished from every
+        PDF. One gradient renders identically in both.
+        """
+        #Classic two-stop-per-colour form. The compact `colour 0% 16%` syntax is
+        #newer CSS and WeasyPrint ignores it, which left the strip missing from PDFs.
+        n = len(self.HOUSE_BAND)
+        stops = []
+        for i, c in enumerate(self.HOUSE_BAND):
+            a, b = 100.0 * i / n, 100.0 * (i + 1) / n
+            stops.append("{} {:.3f}%".format(c, a))
+            stops.append("{} {:.3f}%".format(c, b))
+        return "linear-gradient(to right, " + ", ".join(stops) + ")"
+
     def _abs_css(self):
         """NEXTGAMIS Cloud palette.
 
@@ -1736,9 +1746,7 @@ class FinancialReport:
         NEXTGAMIS ABS green + crimson. Cloud mirrors ABS in structure and logic,
         not in colour.
         """
-        band = ''.join(
-            "<span style='flex:1;height:6px;background:{}'></span>".format(c)
-            for c in self.HOUSE_BAND)
+        band = ''   #the strip is painted by the .ngc-band rule below
         css = """
         <style>
         .ngc-body { font-family: %(font)s; background:#eceff3; margin:0;
@@ -1751,7 +1759,7 @@ class FinancialReport:
         .ngc-container { max-width:fit-content; margin:0 auto; border-radius:10px;
                          overflow:hidden; background:#fff;
                          box-shadow:0 10px 34px rgba(11,42,91,.20); }
-        .ngc-band { display:flex; width:100%%; }
+        .ngc-band { height:7px; width:100%%; background:%(bandgrad)s; }
         /* Each band is closed by a thin gold rule: brand colours on top, navy
            body, gold at the lower boundary - header and footer mirror each other. */
         .ngc-head { background:%(navy)s; color:#fff; padding:20px 28px; text-align:center;
@@ -1818,15 +1826,25 @@ class FinancialReport:
                     border-bottom:3px solid %(gold)s; }
         .ngc-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
 
+        /* Mobile: type goes UP, not down. A 100-column financial table scrolls
+           sideways on a phone whatever we do, so the win is legibility per cell,
+           not fitting more columns on screen. */
         @media screen and (max-width:767px) {
-            .ngc-body { padding:12px 6px; }
-            table.ngc { font-size:1.02rem; }
-            table.ngc thead th { min-width:120px; padding:12px 10px; font-size:1rem; }
-            table.ngc tbody td { padding:10px 11px; }
+            .ngc-body { padding:10px 4px; }
+            .ngc-container { border-radius:6px; }
+            .ngc-head { font-size:1.24rem; padding:18px 16px; }
+            .ngc-head .ngc-sub { font-size:.98rem; }
+            table.ngc { font-size:1.22rem; }
+            table.ngc thead th { min-width:158px; padding:15px 13px; font-size:1.16rem;
+                                 line-height:1.35; }
+            table.ngc tbody td { padding:15px 15px; line-height:1.55; }
+            table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
+                min-width:190px; }
+            .ngc-foot { font-size:.95rem; padding:16px 14px; }
         }
         </style>
         """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY, 'deep': self.HOUSE_DEEP,
-               'gold': self.HOUSE_GOLD}
+               'gold': self.HOUSE_GOLD, 'bandgrad': self._band_gradient()}
         return css, band
 
     def abs_generate_html_report(self, df, title, period_desc, company_name=None,
@@ -1907,7 +1925,7 @@ class FinancialReport:
                                "text-align:left !important;line-height:1.35 !important;}\n" % (i, i))
             elif 'Name of Submitter' in col:
                 detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
-                               "{min-width:250px !important;max-width:400px !important;"
+                               "{min-width:200px !important;max-width:320px !important;"
                                "white-space:normal !important;word-wrap:break-word !important;"
                                "text-align:left !important;line-height:1.2 !important;}\n" % (i, i))
 
@@ -2042,6 +2060,36 @@ class FinancialReport:
         5: ('Compact Report',         'compact',      'Compact_Accounts_Report'),
     }
 
+    # ── Cached pipeline stages ────────────────────────────────────────────────
+    # Normalisation and the calculation pass depend only on the source data and the
+    # period, not on which report is drawn from them. Running several reports used
+    # to repeat both for every one - the same progress lines over and over, and the
+    # same work behind them. Computed once here and reused.
+
+    def _abs_base_frame(self):
+        if getattr(self, '_abs_base_cache', None) is None:
+            self._abs_base_cache = self.normalise_columns(self.raw_df.copy())
+        return self._abs_base_cache
+
+    def _abs_calc_frame(self, period, year=None, start=None, end=None):
+        """Returns (calculated_frame_or_None, period_description)."""
+        key = (period, str(year), str(start), str(end))
+        cache = getattr(self, '_abs_calc_cache', None)
+        if cache is None:
+            cache = self._abs_calc_cache = {}
+        if key not in cache:
+            filtered, desc = self._abs_filter_period(
+                self._abs_base_frame(), period, year, start, end)
+            if filtered.empty:
+                cache[key] = (None, desc)
+            else:
+                self._p("{}: {} submissions across {} date(s); totals and "
+                        "reconciliation computed".format(
+                            desc, len(filtered),
+                            filtered['Date of Transaction'].dt.date.nunique()))
+                cache[key] = (self.abs_run_calculations(filtered), desc)
+        return cache[key]
+
     def abs_report(self, number=1, period='all', year=None, start=None, end=None,
                    company_name=None, output_file=None):
         """NEXTGAMIS ABS reports 1-5 over All Time / a Year / a Date Range.
@@ -2059,34 +2107,24 @@ class FinancialReport:
             return None
         title, mode, slug_base = self.ABS_REPORTS[number]
 
-        base = self.normalise_columns(self.raw_df.copy())
-        filtered, desc = self._abs_filter_period(base, period, year, start, end)
-        if filtered.empty:
+        calc, desc = self._abs_calc_frame(period, year, start, end)
+        if calc is None:
             print("[!] No transaction data for {}.".format(desc))
             return None
 
-        self._p("Period {}: {} submissions across {} date(s)".format(
-            desc, len(filtered), filtered['Date of Transaction'].dt.date.nunique()))
-
-        calc = self.abs_run_calculations(filtered)
-        self._p("Provider totals, aggregates and capital reconciliation computed")
-
         if mode == 'monthly_comm':
             final = self.abs_slice_report(calc, mode)
-            self._p("Commissions aggregated into {} month(s)".format(len(final)))
         elif mode:
             final = self.abs_consolidate_by_date(self.abs_slice_report(calc, mode))
-            self._p("Sliced and consolidated by date: {} rows x {} columns".format(*final.shape))
         else:
             final = self.abs_consolidate_by_date(calc)
-            self._p("Consolidated by date: {} rows x {} columns".format(*final.shape))
 
         out = output_file or self._abs_outfile(slug_base, desc, company_name)
         self.abs_generate_html_report(final, title, desc,
                                       company_name=company_name, output_file=out)
         _mb = os.path.getsize(out) / 1048576.0 if os.path.exists(out) else 0
-        self._p("{} {} -> {}  ({:.1f} MB, {:.1f}s)".format(
-            title, desc, out, _mb, time.time() - _t0), done=True)
+        self._p("{} \u00b7 {} \u00b7 {} rows \u2192 {}  ({:.1f} MB, {:.1f}s)".format(
+            title, desc, len(final), out, _mb, time.time() - _t0), done=True)
         return out
 
     def _abs_outfile(self, slug_base, desc, company_name):
@@ -2098,9 +2136,10 @@ class FinancialReport:
 
     def daily_snapshot_report(self, date, company_name=None, output_file=None):
         """Report 6 - every submission for one date, plus the COMBINED row."""
-        base = self.normalise_columns(self.raw_df.copy())
-        filtered, _ = self._abs_filter_period(base, 'all')
-        calc = self.abs_run_calculations(filtered)
+        calc, _ = self._abs_calc_frame('all')
+        if calc is None:
+            print("[!] No transaction data available.")
+            return None
         target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
         day = calc[self._abs_parse_dates(calc['Date of Transaction'])
                    .dt.strftime('%d/%m/%Y') == target].copy()
@@ -2112,7 +2151,7 @@ class FinancialReport:
         out = output_file or self._abs_outfile('Daily_Snapshot', target.replace('/', '-'), company_name)
         self.abs_generate_html_report(final, 'Daily Snapshot', desc,
                                       company_name=company_name, output_file=out)
-        print("[OK] Daily Snapshot saved -> {}".format(out))
+        self._p("Daily Snapshot \u00b7 {} \u00b7 {} rows \u2192 {}".format(target, len(final), out), done=True)
         return out
 
     # ── Report 7: Quick Report (single date, 4 columns) ───────────────────────
@@ -2126,9 +2165,10 @@ class FinancialReport:
         Zone C: the balance rows, always shown even when zero.
         fmt='pdf' renders A4 portrait via WeasyPrint, falling back to HTML.
         """
-        base = self.normalise_columns(self.raw_df.copy())
-        filtered, _ = self._abs_filter_period(base, 'all')
-        calc = self.abs_run_calculations(filtered)
+        calc, _ = self._abs_calc_frame('all')
+        if calc is None:
+            print("[!] No transaction data available.")
+            return None
         target = pd.to_datetime(date, dayfirst=True).strftime('%d/%m/%Y')
         day = calc[self._abs_parse_dates(calc['Date of Transaction'])
                    .dt.strftime('%d/%m/%Y') == target].copy()
@@ -2218,17 +2258,19 @@ class FinancialReport:
 
         comp = (company_name or 'NEXTGAMIS CLOUD').upper()
         stamp = datetime.now().strftime('%d/%m/%Y at %H:%M:%S')
-        band = ''.join("<span style='flex:1;height:6px;background:{}'></span>".format(c)
-                       for c in self.HOUSE_BAND)
+        band = ''   #painted by the .qr-band rule below
         css = """
         <style>
         @page { size: A4 portrait; margin: 14mm; }
         body { font-family: %(font)s; background:#f4f7f6; padding:28px 14px; }
         .qr-wrap { max-width:980px; margin:0 auto; background:#fff;
                    box-shadow:0 8px 24px rgba(0,0,0,.12); }
-        .qr-band { display:flex; width:100%%; }
+        .qr-band { height:7px; width:100%%; background:%(bandgrad)s; }
+        /* Both bands close with a thin gold rule, matching the main reports:
+           brand colours on top, navy body, gold at the lower boundary. */
         .qr-head { background:%(navy)s; color:#fff; padding:18px 24px; text-align:center;
-                   font-size:1.05rem; font-weight:700; }
+                   font-size:1.05rem; font-weight:700;
+                   border-bottom:3px solid %(gold)s; }
         .qr-head .co { color:%(gold)s; }
         .qr-head .sub { display:block; margin-top:6px; font-weight:400; font-size:.85rem;
                         color:#B9C6DC; }
@@ -2245,12 +2287,14 @@ class FinancialReport:
         tr.zc td { background:#eef4ff; }
         tr.zb td.det { font-style:italic; }
         tr:hover td { background:#EADDCA; }
-        .qr-foot { background:%(deep)s; color:#B9C6DC; padding:16px 24px; text-align:center;
-                   font-size:.8rem; }
+        .qr-foot { background:%(deep)s; color:#c7d4e6; padding:16px 24px; text-align:center;
+                   font-size:.86rem; line-height:1.6;
+                   border-bottom:3px solid %(gold)s; }
         .qr-foot a { color:%(gold)s; text-decoration:none; font-weight:600; }
         </style>
         """ % {'font': self.ABS_FONT, 'navy': self.HOUSE_NAVY,
-               'deep': self.HOUSE_DEEP, 'gold': self.HOUSE_GOLD}
+               'deep': self.HOUSE_DEEP, 'gold': self.HOUSE_GOLD,
+               'bandgrad': self._band_gradient()}
 
         html = ("<html><head><meta charset='utf-8'>"
                 "<meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -2261,6 +2305,7 @@ class FinancialReport:
                 "<table class='qr'><thead><tr><th>#</th><th>Description</th>"
                 "<th style='text-align:right'>Amount (TZS)</th><th>Details</th></tr></thead>"
                 "<tbody>{body}</tbody></table>"
+                "<div class='qr-band'>{band}</div>"
                 "<div class='qr-foot'>NEXTGAMIS Cloud &nbsp;|&nbsp; {co} &nbsp;|&nbsp; {stamp}<br>"
                 "Automated Agency Banking Reporting &copy; 2026 "
                 "<a href='https://www.tssfl.com'>TSSFL Technology Stack</a></div>"
@@ -2273,12 +2318,12 @@ class FinancialReport:
         if fmt == 'pdf':
             try:
                 HTML(string=html).write_pdf(stem + '.pdf')
-                print("[OK] Quick Report (PDF) saved -> {}.pdf".format(stem))
+                self._p("Quick Report (PDF) \u00b7 {} \u2192 {}.pdf".format(target, stem), done=True)
                 return stem + '.pdf'
             except Exception as e:
                 print("[!] PDF engine unavailable ({}) - saving HTML instead.".format(e))
         with open(stem + '.html', 'w', encoding='utf-8') as f:
             f.write(html)
-        print("[OK] Quick Report (HTML) saved -> {}.html".format(stem))
+        self._p("Quick Report (HTML) \u00b7 {} \u2192 {}.html".format(target, stem), done=True)
         return stem + '.html'
 

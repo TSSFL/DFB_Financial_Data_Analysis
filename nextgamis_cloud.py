@@ -1783,6 +1783,21 @@ class FinancialReport:
         df['Date of Transaction'] = self._abs_parse_dates(
             df['Date of Transaction']).dt.strftime('%d/%m/%Y')
 
+        #The submission stamp reaches here month-first, the way the loaders
+        #normalise it, while every other date in the report is day-first - so a
+        #snapshot showed "Reporting Date 11/08/2024" next to "Date of Transaction
+        #01/11/2024", one week of November printed two different ways, and the
+        #reporting date read as though it preceded the transaction. The COMBINED
+        #rows built below already stamp %d/%m/%Y, so converting here, before the
+        #rows are read out, brings both kinds of row into one format.
+        #Deliberately not idempotent-proofed: consolidation always runs on a
+        #fresh copy of the cached calc frame, never on its own output.
+        if 'Date of Submission' in df.columns:
+            stamped = pd.to_datetime(df['Date of Submission'],
+                                     format='%m/%d/%Y %H:%M:%S', errors='coerce')
+            df['Date of Submission'] = stamped.dt.strftime(
+                '%d/%m/%Y %H:%M:%S').fillna(df['Date of Submission'])
+
         #iterrows() built a one-off object Series per row and to_dict() walked it
         #again - two passes over every cell to produce dicts that to_dict('records')
         #hands over in one vectorised call. Same dicts, same order.

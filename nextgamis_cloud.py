@@ -106,6 +106,19 @@ class FinancialReport:
     _DATE_COLS = (('Timestamp', '%m/%d/%Y %H:%M:%S'),
                   ('Date of Transaction', '%m/%d/%Y'))
 
+    #Every stamp this class generates is East Africa Time, because that is the
+    #timezone the data is recorded in - the form writes 'GMT+0300' and the
+    #Reporting Date column carries that reading unchanged. datetime.now() is
+    #naive local time, so it agrees on a machine set to EAT and runs three hours
+    #behind on SageCell, which is UTC; now(tz) is absolute and agrees anywhere.
+    #Tanzania keeps UTC+3 year-round with no DST, so a fixed offset is exact and
+    #needs no tzdata on the host.
+    _EAT = timezone(timedelta(hours=3))
+
+    @classmethod
+    def _now(cls):
+        return datetime.now(cls._EAT)
+
     @classmethod
     def _normalise_source_dates(cls, df):
         """Put the date columns into the format the rest of the class expects.
@@ -1804,6 +1817,10 @@ class FinancialReport:
         df = df.reset_index(drop=True)
         records = df.to_dict('records')
 
+        #One reading for the whole consolidation, so every COMBINED row in a run
+        #carries the same stamp instead of times drifting a few milliseconds apart.
+        run_stamp = self._now().strftime('%d/%m/%Y %H:%M:%S')
+
         final_rows = []
         for date, group in df.groupby('Date of Transaction', sort=False):
             final_rows.extend(records[i] for i in group.index)
@@ -1824,7 +1841,7 @@ class FinancialReport:
                                 not in ['nan', '', 'none', '0', '0.0']]
                         summary[col] = ' ; '.join(vals) if vals else ''
                 summary.update({'Date of Transaction': date,
-                                'Date of Submission': datetime.now().strftime('%d/%m/%Y %H:%M:%S')})
+                                'Date of Submission': run_stamp})
                 final_rows.append(summary)
 
         res = pd.DataFrame(final_rows)
@@ -2170,7 +2187,7 @@ class FinancialReport:
 
         css, band = self._abs_css()
         comp = (company_name or 'NEXTGAMIS CLOUD').upper()
-        stamp = datetime.now().strftime('%d/%m/%Y at %H:%M:%S')
+        stamp = self._now().strftime('%d/%m/%Y at %H:%M:%S')
         head = ("{} {}<span class='ngc-sub'>Generated for "
                 "<span class='ngc-co'>{}</span> on {}</span>").format(title, period_desc, comp, stamp)
         foot = ("NEXTGAMIS Cloud &nbsp;|&nbsp; {} &nbsp;|&nbsp; Generated on {}<br>"
@@ -2374,7 +2391,7 @@ class FinancialReport:
         the scope is dropped rather than repeated; a scope covering some other
         day is kept, because then it says something the stamp does not.
         """
-        now = datetime.now()
+        now = self._now()
         slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
         scope = desc.replace(' ', '_')
         if re.sub(r'\D', '', scope) == now.strftime('%d%m%Y'):
@@ -2535,7 +2552,7 @@ class FinancialReport:
                                                                 amt_cell(val, kind, col), safe))
 
         comp = (company_name or 'NEXTGAMIS CLOUD').upper()
-        stamp = datetime.now().strftime('%d/%m/%Y at %H:%M:%S')
+        stamp = self._now().strftime('%d/%m/%Y at %H:%M:%S')
         band = self._band_html()   #six cells; .qr-band below lays them out
         css = """
         <style>

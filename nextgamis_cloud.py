@@ -2380,25 +2380,38 @@ class FinancialReport:
         return out
 
     def _abs_outfile(self, slug_base, desc, company_name):
-        """Build the filename: <Company>-<Report>_<Scope>-DD_MM_YYYY-HH_MM_SS.html
+        """Build the filename: <Company>-<Report>[_<Scope>]-DD_MM_YYYY-HH_MM_SS.html
 
         Dashes separate the fields, underscores live inside them, so the
         date and the clock each read as a date and a clock instead of running
         together into one fourteen-digit block.
 
-        Single-date reports otherwise carry their date twice - once as the
-        scope, once as the generation stamp. When the two fall on the same day
-        the scope is dropped rather than repeated; a scope covering some other
-        day is kept, because then it says something the stamp does not.
+        The date field is the day the report covers when it covers exactly
+        one day, and the day it was generated otherwise. Single-date reports
+        used to carry both, which read as one date when the two coincided and
+        as a run-on pair when they did not:
+
+            Quick_Report_01-09-2026-02_09_2026-11_00_15   generated a day later
+
+        The clock is always the generation time, and the document header
+        carries the full generation stamp, so filing a report under its own
+        date loses nothing. A report for today is named exactly as before.
+
+        Eight digits is what marks a single date: 'All Time' has none, a year
+        has four, and 'From ... to ...' has sixteen.
         """
         now = self._now()
         slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
         scope = desc.replace(' ', '_')
-        if re.sub(r'\D', '', scope) == now.strftime('%d%m%Y'):
-            scope = ''       #single-date report for today - the stamp already says so
-        return "{}-{}{}-{}.html".format(slug, slug_base,
-                                        '_' + scope if scope else '',
-                                        now.strftime('%d_%m_%Y-%H_%M_%S'))
+        digits = re.sub(r'\D', '', scope)
+        if len(digits) == 8:
+            day = '{}_{}_{}'.format(digits[:2], digits[2:4], digits[4:])
+            scope = ''       #the date field now carries it - do not say it twice
+        else:
+            day = now.strftime('%d_%m_%Y')
+        return "{}-{}{}-{}-{}.html".format(slug, slug_base,
+                                           '_' + scope if scope else '',
+                                           day, now.strftime('%H_%M_%S'))
 
     # ── Report 6: Daily Snapshot (single date) ────────────────────────────────
 

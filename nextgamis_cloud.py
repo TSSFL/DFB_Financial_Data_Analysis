@@ -1,6 +1,11 @@
 #NEXTGAMIS Cloud - Agency Banking Reporting
 #TSSFL Technology Stack - www.tssfl.com
 #
+#Required Notice: Copyright TSSFL / TSSFL Technology Stack (https://www.tssfl.com)
+#Licensed under the PolyForm Noncommercial License 1.0.0 - noncommercial use only.
+#Full terms: https://polyformproject.org/licenses/noncommercial/1.0.0
+#Commercial use requires a licence from TSSFL: sales@tssfl.co
+#
 #Single class, loadable directly from GitHub:
 #   load("https://raw.githubusercontent.com/TSSFL/DFB_Financial_Data_Analysis/master/nextgamis_cloud.py")
 #

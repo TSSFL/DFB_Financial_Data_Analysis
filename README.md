@@ -219,6 +219,27 @@ New work should target `nextgamis_cloud.py`.
 **NEXTGAMIS ABS** — the offline-first agency banking terminal these reports match:
 compiled cross-platform binary, encrypted local storage, offline licensing, and a
 forensic audit trail. Reports 1–7 above are its reports, computed in the cloud.
+ABS is proprietary and licensed separately per installation.
+
+---
+
+## License
+
+[PolyForm Noncommercial License 1.0.0](LICENSE.md).
+
+| | |
+|---|---|
+| **Free** | Research, teaching, study, personal and hobby projects; charities, educational institutions, public research bodies, and government institutions — regardless of funding source |
+| **Not permitted** | Any commercial use |
+
+For a commercial license, contact [sales@tssfl.co](mailto:sales@tssfl.co).
+
+The module carries the required notice in its header, so the terms travel with the
+file when it is loaded straight from a URL. NEXTGAMIS™ is a trademark and
+servicemark of TSSFL / TSSFL Technology Stack; the license grants no rights in the
+name, logo, or branding.
+
+Copyright © 2024–2026 TSSFL / TSSFL Technology Stack. All rights reserved.
 
 ---
 

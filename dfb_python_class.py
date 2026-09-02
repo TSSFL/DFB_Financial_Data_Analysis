@@ -1,3 +1,11 @@
+#NEXTGAMIS Cloud - Agency Banking Reporting (legacy class)
+#TSSFL Technology Stack - www.tssfl.com
+#
+#Required Notice: Copyright TSSFL / TSSFL Technology Stack (https://www.tssfl.com)
+#Licensed under the PolyForm Noncommercial License 1.0.0 - noncommercial use only.
+#Full terms: https://polyformproject.org/licenses/noncommercial/1.0.0
+#Commercial use requires a licence from TSSFL: sales@tssfl.co
+
 import gspread
 import urllib.request
 import numpy as np

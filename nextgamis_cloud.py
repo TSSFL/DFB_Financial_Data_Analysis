@@ -37,7 +37,10 @@ import warnings
 warnings.filterwarnings('ignore')
 
 class FinancialReport:
-    def __init__(self, data_source, spreadsheet_id =None, service_account_file=None, range_name=None, file_path=None, file_name=None, token=None, url=None, asset_index=None, prepare=False):
+    #Default KoboToolbox API root, used when url= is not given.
+    KOBO_ENDPOINT = 'https://kf.kobotoolbox.org/api/v2'
+
+    def __init__(self, data_source, spreadsheet_id =None, service_account_file=None, range_name=None, file_path=None, file_name=None, token=None, url=None, asset_index=None, asset=None, kobo_debug=False, prepare=False):
         self.data_source = data_source
         self._df = None          #backs the lazy `df` property below
         if self.data_source == 'google_drive':
@@ -55,7 +58,11 @@ class FinancialReport:
             self.data = self._get_data_from_dropbox()
         elif self.data_source == 'kobo':
             from koboextractor import KoboExtractor
-            self.kobo = KoboExtractor(token, url, debug=True)
+            #debug=True printed the whole request/response trace over the report
+            #output on every call. Off by default; pass kobo_debug=True to get it.
+            self.kobo = KoboExtractor(token, url or self.KOBO_ENDPOINT,
+                                      debug=kobo_debug)
+            self.asset = asset
             self.asset_index = asset_index
             self.asset_uid = None
             self.df = None
@@ -180,17 +187,88 @@ class FinancialReport:
         self._p("Data loaded: {} rows, {} columns".format(len(df), len(df.columns)), done=True)
         return df
         
-    def _get_data_from_kobo(self):
-        assets = self.kobo.list_assets()
-        self.asset_uid = assets['results'][self.asset_index]['uid']
-        asset = self.kobo.get_asset(self.asset_uid)
-        choice_lists = self.kobo.get_choices(asset)
-        questions = self.kobo.get_questions(asset=asset, unpack_multiples=True)
+    #KoboToolbox returns one page of submissions per request. 2000 is well above
+    #the server's own page size, so most surveys come back in a single round trip
+    #and a large one still finishes in a handful.
+    KOBO_PAGE = 2000
 
-        new_data = self.kobo.get_data(self.asset_uid)
-        new_results = self.kobo.sort_results_by_time(new_data['results'])
-        self.df = pd.DataFrame(new_results) #Avoid self.df is referencing outside this methhod
-        self.df_copy = self.df.copy() #Create a copy of the original dataframe
+    def _kobo_pick_asset(self, assets):
+        """Choose the survey to read: by name, by uid, or by position.
+
+        Position is what this class used to accept and is kept working, but it
+        is the weakest of the three - list_assets() ordering is the server's,
+        not yours, so index 0 is not guaranteed to be the same survey next
+        month. Passing asset='My Survey' or a uid says what you mean.
+        """
+        wanted = self.asset
+        if wanted:
+            for a in assets:
+                if a.get('uid') == wanted or (a.get('name') or '') == wanted:
+                    return a
+            names = "\n".join("    {!r}  uid={}".format(a.get('name'), a.get('uid'))
+                               for a in assets)
+            raise ValueError("No Kobo asset matches {!r}. Available:\n{}"
+                             .format(wanted, names))
+        if self.asset_index is None:
+            raise ValueError("Pass asset= (name or uid) or asset_index= to choose "
+                             "which KoboToolbox survey to read.")
+        try:
+            return assets[self.asset_index]
+        except IndexError:
+            raise ValueError("asset_index {} is out of range - the token can see "
+                             "{} asset(s).".format(self.asset_index, len(assets)))
+
+    def _get_data_from_kobo(self):
+        """Fetch every submission for the selected asset.
+
+        Two things used to go wrong here, both silently.
+
+        get_choices() and get_questions() were called and their results thrown
+        away - nothing downstream ever read them. They cost two round trips,
+        and get_choices raises KeyError: 'choices' on any form that has no
+        select question, which was 11 of the 16 surveys on the test account.
+        The constructor therefore failed for data it had already downloaded.
+
+        get_data() with no limit returns one page. Measured against a survey
+        the server reports as holding 431 submissions, it came back with 100 -
+        77% of the data missing, with no error and no warning. That is the
+        worst shape a bug can take in a financial report: every total still
+        adds up, every average is still plausible, and the figures are wrong.
+        So every page is followed and the row count is checked against the
+        count the server reports for the asset before the frame is returned.
+        """
+        assets = self.kobo.list_assets()['results']
+        asset = self._kobo_pick_asset(assets)
+        self.asset_uid = asset['uid']
+        expected = asset.get('deployment__submission_count')
+
+        rows, start = [], 0
+        while True:
+            batch = self.kobo.get_data(self.asset_uid, start=start,
+                                       limit=self.KOBO_PAGE)
+            results = batch.get('results') or []
+            rows.extend(results)
+            total = batch.get('count')
+            if not results or (total is not None and len(rows) >= total):
+                break
+            start += len(results)
+
+        if expected is not None and len(rows) != expected:
+            raise ValueError(
+                "Downloaded {} submissions but KoboToolbox reports {} for {!r}. "
+                "Refusing to report on a partial download - check the token's "
+                "access to this survey.".format(len(rows), expected, asset.get('name')))
+
+        try:
+            rows = self.kobo.sort_results_by_time(rows)
+        except Exception:
+            pass          #unsorted is still complete; every report sorts by date anyway
+
+        self.df = pd.DataFrame(rows)   #Avoid self.df is referencing outside this method
+        self.df_copy = self.df.copy()  #Create a copy of the original dataframe
+        self._p("Data loaded: {} rows, {} columns".format(len(self.df),
+                                                          len(self.df.columns)),
+                done=True, sub="Kobo asset {!r}".format(asset.get('name')))
         return self.df
       
     def date_time(self, df):

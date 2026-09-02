@@ -73,9 +73,20 @@ FinancialReport(data_source='google_drive',
                 service_account_file='<path or URL to the JSON key>',
                 range_name='<optional A1 range>')
 
-# KoboToolbox
-FinancialReport('kobo', token='<api token>', url='<kobo api url>', asset_index=0)
+# KoboToolbox — choose the survey by name or uid
+FinancialReport('kobo', token='<api token>', asset='My Survey Name')
+FinancialReport('kobo', token='<api token>', asset='aN5e7mf4CY6uKq2NrckxtY')
+FinancialReport('kobo', token='<api token>', asset_index=0)   # by position
 ```
+
+`url=` defaults to `https://kf.kobotoolbox.org/api/v2`; pass it for a different
+server. `kobo_debug=True` turns on the extractor's request trace.
+
+Every submission is fetched, following the server's pagination, and the row count
+is checked against the count KoboToolbox reports for the asset — a short download
+raises rather than reporting on part of a survey. Prefer `asset=` over
+`asset_index=`: the index is a position in the server's own listing, so it is not
+guaranteed to name the same survey twice.
 
 `prepare=True` builds the legacy prepared frame eagerly at construction. By default
 it is built on first use, so a run that only touches reports 1–7 never pays for it.

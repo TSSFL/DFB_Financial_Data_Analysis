@@ -284,7 +284,7 @@ file when it is loaded straight from a URL. NEXTGAMIS™ is a trademark and
 servicemark of TSSFL / TSSFL Technology Stack; the license grants no rights in the
 name, logo, or branding.
 
-Copyright © 2024–2026 TSSFL / TSSFL Technology Stack. All rights reserved.
+Copyright © 2022–2026 TSSFL / TSSFL Technology Stack. All rights reserved.
 
 ---
 

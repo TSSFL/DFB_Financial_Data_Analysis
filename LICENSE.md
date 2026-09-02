@@ -1,7 +1,7 @@
 Required Notice: Copyright TSSFL / TSSFL Technology Stack (https://www.tssfl.com)
 
 NEXTGAMIS Cloud — Agency Banking Reporting
-Copyright © 2024–2026 TSSFL / TSSFL Technology Stack. All rights reserved.
+Copyright © 2022–2026 TSSFL / TSSFL Technology Stack. All rights reserved.
 
 This software is made available under the PolyForm Noncommercial License 1.0.0,
 reproduced in full below. In short:

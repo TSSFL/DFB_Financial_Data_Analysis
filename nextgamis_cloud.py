@@ -192,6 +192,184 @@ class FinancialReport:
     #and a large one still finishes in a handful.
     KOBO_PAGE = 2000
 
+    #Kobo submissions come back keyed by the form's XML question names -
+    #'group_float/selcom_1', '_submission_time' - not by the labels every report
+    #in this class expects. _kobo_to_abs() bridges the two. Nothing here is
+    #guessed at run time from the data: the rules below are the convention an ABS
+    #collection form is expected to follow, and KOBO_FIELD_MAP is the escape
+    #hatch for a form that does not.
+
+    #The two Kobo metadata fields that carry real meaning for a report.
+    #_submission_time is the server's receipt stamp, which is what the Google
+    #Forms source calls Timestamp; everything else beginning with '_' is
+    #bookkeeping and is dropped.
+    KOBO_META_MAP = {
+        '_submission_time': 'Timestamp',
+        '_submitted_by':    'Name of Submitter',
+    }
+
+    #Form-specific overrides: {kobo question name: exact ABS column name}.
+    #Set this on the instance or subclass when the collection form's question
+    #names do not follow the convention below. An entry here wins over every
+    #other rule, so it is the one place a mismatch has to be fixed.
+    #
+    #    r = FinancialReport(data_source='kobo', token=..., asset=...)
+    #    FinancialReport.KOBO_FIELD_MAP = {'q_selcom': 'SELCOM 1',
+    #                                      'txn_date': 'Date of Transaction'}
+    KOBO_FIELD_MAP = {}
+
+    #Kobo timestamps are ISO 8601. _submission_time is UTC; a date question has
+    #no timezone at all. The rest of the class works in East Africa Time, so the
+    #stamp is converted and the plain date is left alone.
+    _KOBO_TS_COLS = {'Timestamp': ('%m/%d/%Y %H:%M:%S', True),
+                     'Date of Transaction': ('%m/%d/%Y', False)}
+
+    #Built once on first use by _abs_known_names().
+    _ABS_NAME_INDEX = None
+
+    @classmethod
+    def _abs_known_names(cls):
+        """{name with separators and case removed: the exact ABS spelling}.
+
+        A Kobo question name cannot preserve either. 'M-PESA' is written
+        m_pesa and 'Date of Transaction' is written date_of_transaction, so a
+        blanket uppercase yields 'M PESA' and 'DATE OF TRANSACTION' - neither
+        of which any report recognises. Squashing both sides down to letters
+        and digits makes the lookup indifferent to what the form author typed.
+        """
+        if cls._ABS_NAME_INDEX is None:
+            names = set(cls.ABS_NON_PROVIDER)
+            names |= {cls.SELCOM}
+            names |= set(cls.MOBILE_POOL) | set(cls.BANK_POOL) | set(cls.AGENCY_POOL)
+            names |= set(cls.PROVIDER_ALIASES)
+            cls._ABS_NAME_INDEX = {re.sub(r'[^a-z0-9]', '', n.lower()): n
+                                   for n in names}
+        return cls._ABS_NAME_INDEX
+
+    @classmethod
+    def _abs_spelling(cls, text):
+        """The exact ABS spelling of a name, or None if it is not a known one."""
+        return cls._abs_known_names().get(re.sub(r'[^a-z0-9]', '', text.lower()))
+
+    @classmethod
+    def _kobo_field_to_abs(cls, field):
+        """One Kobo question name -> the ABS column name, or None to drop it.
+
+        Rules, in order:
+          1. KOBO_FIELD_MAP - an explicit override for this form.
+          2. The group path is dropped: 'group_float/selcom_1' -> 'selcom_1'.
+          3. Kobo bookkeeping ('_id', 'meta/instanceID', 'formhub/uuid', ...)
+             is dropped, except the two fields in KOBO_META_MAP.
+          4. A name the class already knows takes that name's exact spelling,
+             matched without case or separators: 'date_of_transaction' ->
+             'Date of Transaction', 'm_pesa' -> 'M-PESA'.
+          5. Otherwise the name is split the way normalise_column() splits one -
+             base, optional SUPERAGENT, optional index, optional COMM, optional
+             Details - the base is spelled from rule 4, and the parts are put
+             back: 'halo_pesa_superagent_2_comm' -> 'HALO-PESA SUPERAGENT 2 COMM'.
+          6. A base that is not a known name is uppercased as a last resort.
+             Its original casing is unrecoverable from a Kobo question name -
+             'mobile_bundles_and_shares' cannot say that 'and' was lowercase -
+             so _kobo_to_abs() reports these for KOBO_FIELD_MAP to settle.
+        """
+        if field in cls.KOBO_FIELD_MAP:
+            return cls.KOBO_FIELD_MAP[field]
+
+        leaf = field.rsplit('/', 1)[-1]
+        if leaf in cls.KOBO_META_MAP:
+            return cls.KOBO_META_MAP[leaf]
+        if leaf.startswith('_') or field.startswith(('formhub/', 'meta/')):
+            return None
+
+        spaced = re.sub(r'[\s_-]+', ' ', leaf).strip()
+        if not spaced:
+            return None
+
+        hit = cls._abs_spelling(spaced)
+        if hit:
+            return hit
+
+        rest, details, comm, tail = spaced, False, False, []
+        if rest.lower().endswith(' details'):
+            rest, details = rest[:-len(' details')], True
+        if rest.lower().endswith(' comm'):
+            rest, comm = rest[:-len(' comm')], True
+        #SUPERAGENT and the index appear in either order - ABS puts the index
+        #last, the legacy Cloud forms put it first. Peel whichever is there and
+        #hand both back to normalise_column() in the order they arrived.
+        while True:
+            m = re.search(r'(?i)\s+(superagent|\d+)$', rest)
+            if not m:
+                break
+            tail.insert(0, m.group(1))
+            rest = rest[:m.start()]
+
+        base = cls._abs_spelling(rest)
+        out = ' '.join([base or rest.upper()]
+                       + [t if t.isdigit() else t.upper() for t in tail])
+        if comm:
+            out += ' COMM'
+        if details:
+            out += ' Details'
+        return out
+
+    def _kobo_to_abs(self, df):
+        """Rename a raw Kobo submission frame into ABS columns.
+
+        A form whose questions do not follow the convention will still load -
+        the columns simply arrive under names no report knows, and every report
+        then comes out empty. That is the failure this reports on rather than
+        letting it pass: the count of columns kept and dropped is printed, and a
+        missing 'Date of Transaction' is called out by name, because without it
+        every period filter matches nothing and each report says 'No transaction
+        data' for what looks like a healthy download.
+        """
+        if df.empty:
+            return df
+
+        rename, dropped, guessed = {}, [], []
+        for field in df.columns:
+            target = self._kobo_field_to_abs(field)
+            if target is None:
+                dropped.append(field)
+                continue
+            rename[field] = target
+            base = re.sub(r' (?:COMM|Details)$', '', target)
+            #SUPERAGENT and the index come in either order; peel the whole run.
+            base = re.sub(r'(?i)(?: (?:superagent|\d+))+$', '', base).strip()
+            if field not in self.KOBO_FIELD_MAP and self._abs_spelling(base) is None:
+                guessed.append((field, target))
+
+        df = df.drop(columns=dropped).rename(columns=rename)
+        df = df.loc[:, ~df.columns.duplicated()]
+        self._p("Kobo fields mapped to ABS naming",
+                sub="{} kept, {} metadata dropped".format(len(df.columns), len(dropped)))
+
+        if guessed:
+            #Not an error: a free-text column reads fine under an uppercased
+            #name. But a provider whose name the roster does not hold is a
+            #column whose totals nothing will group, so say which ones were
+            #guessed rather than letting the report look complete.
+            self._warn("Mapped by convention, not from the roster - add a "
+                       "KOBO_FIELD_MAP entry if any of these is wrong: "
+                       + ", ".join("{} -> {}".format(f, t) for f, t in guessed[:8])
+                       + (" (+{} more)".format(len(guessed) - 8) if len(guessed) > 8 else ""))
+
+        for col, (out_fmt, to_eat) in self._KOBO_TS_COLS.items():
+            if col not in df.columns:
+                continue
+            parsed = pd.to_datetime(df[col], errors='coerce', utc=to_eat)
+            if to_eat:
+                parsed = parsed.dt.tz_convert(self._EAT)
+            df[col] = parsed.dt.strftime(out_fmt).fillna(df[col].astype(str))
+
+        if 'Date of Transaction' not in df.columns:
+            self._warn("No 'Date of Transaction' column after mapping - every "
+                       "report will be empty. Set KOBO_FIELD_MAP to point at the "
+                       "form's date question. Columns seen: "
+                       + ", ".join(map(str, list(df.columns)[:12])))
+        return df
+
     def _kobo_pick_asset(self, assets):
         """Choose the survey to read: by name, by uid, or by position.
 
@@ -265,10 +443,11 @@ class FinancialReport:
             pass          #unsorted is still complete; every report sorts by date anyway
 
         self.df = pd.DataFrame(rows)   #Avoid self.df is referencing outside this method
-        self.df_copy = self.df.copy()  #Create a copy of the original dataframe
         self._p("Data loaded: {} rows, {} columns".format(len(self.df),
                                                           len(self.df.columns)),
                 done=True, sub="Kobo asset {!r}".format(asset.get('name')))
+        self.df = self._kobo_to_abs(self.df)
+        self.df_copy = self.df.copy()  #Create a copy of the original dataframe
         return self.df
       
     def date_time(self, df):

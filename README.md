@@ -88,6 +88,40 @@ raises rather than reporting on part of a survey. Prefer `asset=` over
 `asset_index=`: the index is a position in the server's own listing, so it is not
 guaranteed to name the same survey twice.
 
+#### Naming an ABS collection form
+
+Kobo submissions arrive keyed by the form's XML question names, not by the labels
+the reports expect, so the names are mapped on the way in. Write the questions in
+snake_case and the mapping is automatic:
+
+| Kobo question | Becomes |
+|---|---|
+| `group_txn/date_of_transaction` | `Date of Transaction` |
+| `group_float/m_pesa` | `M-PESA` |
+| `halo_pesa_superagent_2_comm` | `HALO-PESA SUPERAGENT 2 COMM` |
+| `selcom_1_details` | `SELCOM 1 Details` |
+| `_submission_time` | `Timestamp` (UTC → EAT) |
+| `_submitted_by` | `Name of Submitter` |
+| `_id`, `_uuid`, `meta/…`, `formhub/…` | dropped |
+
+Group paths are stripped, and separators and case are ignored when matching, so
+`m_pesa` recovers the roster's `M-PESA` rather than becoming `M PESA`.
+
+A question the roster does not know is uppercased and **reported**, because its
+original casing cannot be recovered from a Kobo name — `mobile_bundles_and_shares`
+cannot say that `and` was lowercase. Settle those with `KOBO_FIELD_MAP`:
+
+```python
+FinancialReport.KOBO_FIELD_MAP = {
+    'group_txn/txn_date': 'Date of Transaction',
+    'group_float/mb_shares_details': 'MOBILE BUNDLES and SHARES Details',
+}
+```
+
+An entry there wins over every other rule. If `Date of Transaction` is missing
+after mapping, the load says so by name — without it every report is empty for
+what otherwise looks like a healthy download.
+
 `prepare=True` builds the legacy prepared frame eagerly at construction. By default
 it is built on first use, so a run that only touches reports 1–7 never pays for it.
 

@@ -2387,8 +2387,12 @@ class FinancialReport:
             else:
                 num = pd.to_numeric(fdf[c], errors='coerce')
                 if not num.isna().all():
-                    fdf[c] = num.apply(
-                        lambda x: "{:,.2f}".format(float(x)) if pd.notnull(x) else '')
+                    #'{:,.2f}'.format is a bound C method. The lambda around it
+                    #cost a Python frame, a float() and a pd.notnull() on every
+                    #cell - 96,000 of each on the comprehensive report - to do
+                    #what the formatter already does. NaN formats as 'nan', so
+                    #the blanks are restored in one vectorised pass.
+                    fdf[c] = num.map('{:,.2f}'.format).where(num.notna(), '')
 
         def get_val(x):
             try:
@@ -2404,31 +2408,54 @@ class FinancialReport:
         multi_dates = fdf[fdf.duplicated(subset=[date_col], keep=False)][date_col].unique()
         summary_labels = list(self.ABS_SUMMARY_LABELS)
 
-        for i in fdf.index:
-            sub = str(fdf.at[i, 'Name of Submitter']) if 'Name of Submitter' in fdf.columns else ''
-            tdate = fdf.at[i, date_col]
-            is_combined = sub.startswith('COMBINED')
-            #On a multi-submission date the per-counter rows carry no reconciliation
-            #of their own - only the COMBINED row does - so blank them out.
-            if tdate in multi_dates and not is_combined and tdate not in summary_labels:
-                for col in ['EXPECTED OPERATING CAPITAL', 'EXCESS', 'LOSS', 'EXCESS/LOSS']:
-                    if col in fdf.columns:
-                        fdf.at[i, col] = ''
-            elif 'ACTUAL OPERATING CAPITAL' in fdf.columns and 'EXPECTED OPERATING CAPITAL' in fdf.columns:
-                act, exp = get_val(fdf.at[i, 'ACTUAL OPERATING CAPITAL']), get_val(fdf.at[i, 'EXPECTED OPERATING CAPITAL'])
-                color = GREEN if abs(act - exp) < 0.01 else RED
-                fdf.at[i, 'ACTUAL OPERATING CAPITAL'] = style_val(fdf.at[i, 'ACTUAL OPERATING CAPITAL'], color)
-                fdf.at[i, 'EXPECTED OPERATING CAPITAL'] = style_val(fdf.at[i, 'EXPECTED OPERATING CAPITAL'], color)
-                if 'EXCESS' in fdf.columns and get_val(fdf.at[i, 'EXCESS']) > 0.01:
-                    fdf.at[i, 'EXCESS'] = style_val(fdf.at[i, 'EXCESS'], AMBER)
-                if 'LOSS' in fdf.columns and get_val(fdf.at[i, 'LOSS']) > 0.01:
-                    fdf.at[i, 'LOSS'] = style_val(fdf.at[i, 'LOSS'], RED)
-                if 'EXCESS/LOSS' in fdf.columns:
-                    v = get_val(fdf.at[i, 'EXCESS/LOSS'])
-                    if v > 0.01:
-                        fdf.at[i, 'EXCESS/LOSS'] = style_val(fdf.at[i, 'EXCESS/LOSS'], AMBER)
-                    elif v < -0.01:
-                        fdf.at[i, 'EXCESS/LOSS'] = style_val(fdf.at[i, 'EXCESS/LOSS'], RED)
+        #This was a row loop over .at[] - fourteen scalar gets and sets per row,
+        #every one of them a full indexing round trip through the block manager.
+        #The rules are per-row but they are pure functions of the row, so they
+        #express as masks. get_val and style_val are kept: they are still the
+        #definition of the behaviour, and the vectorised forms below mirror them
+        #exactly (to_numeric(..., errors='coerce').fillna(0) is get_val's
+        #try/except; the concatenation is style_val's format string).
+        def col_vals(col):
+            return pd.to_numeric(
+                fdf[col].astype(str).str.replace(',', '', regex=False),
+                errors='coerce').fillna(0.0)
+
+        def styled(col, colors):
+            return ("<span style='color: " + colors + "; font-weight: bold;'>"
+                    + fdf[col].astype(str) + "</span>")
+
+        sub_s = (fdf['Name of Submitter'].astype(str)
+                 if 'Name of Submitter' in fdf.columns
+                 else pd.Series('', index=fdf.index))
+        tdate_s = fdf[date_col]
+        #On a multi-submission date the per-counter rows carry no reconciliation
+        #of their own - only the COMBINED row does - so blank them out.
+        blank = (tdate_s.isin(multi_dates)
+                 & ~sub_s.str.startswith('COMBINED')
+                 & ~tdate_s.isin(summary_labels))
+        for col in ['EXPECTED OPERATING CAPITAL', 'EXCESS', 'LOSS', 'EXCESS/LOSS']:
+            if col in fdf.columns:
+                fdf.loc[blank, col] = ''
+
+        if 'ACTUAL OPERATING CAPITAL' in fdf.columns and 'EXPECTED OPERATING CAPITAL' in fdf.columns:
+            #The elif: a row that was blanked is never also styled.
+            style = ~blank
+            act, exp = col_vals('ACTUAL OPERATING CAPITAL'), col_vals('EXPECTED OPERATING CAPITAL')
+            colors = pd.Series(np.where((act - exp).abs() < 0.01, GREEN, RED),
+                               index=fdf.index)
+            for col in ('ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL'):
+                fdf.loc[style, col] = styled(col, colors)[style]
+            if 'EXCESS' in fdf.columns:
+                m = style & (col_vals('EXCESS') > 0.01)
+                fdf.loc[m, 'EXCESS'] = styled('EXCESS', pd.Series(AMBER, index=fdf.index))[m]
+            if 'LOSS' in fdf.columns:
+                m = style & (col_vals('LOSS') > 0.01)
+                fdf.loc[m, 'LOSS'] = styled('LOSS', pd.Series(RED, index=fdf.index))[m]
+            if 'EXCESS/LOSS' in fdf.columns:
+                v = col_vals('EXCESS/LOSS')
+                for m, c in ((style & (v > 0.01), AMBER), (style & (v < -0.01), RED)):
+                    fdf.loc[m, 'EXCESS/LOSS'] = styled('EXCESS/LOSS',
+                                                       pd.Series(c, index=fdf.index))[m]
 
         #Wide tier for free-text columns, moderate tier for submitter names -
         #this is the string-breaking that the old Cloud layout could not do.

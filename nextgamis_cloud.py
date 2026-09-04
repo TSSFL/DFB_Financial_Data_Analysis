@@ -178,7 +178,10 @@ class FinancialReport:
         return data
         
     def _get_data_from_dropbox(self):
-        self._p("Fetching data from Dropbox ...")
+        #The storage backend is an implementation detail; the product is
+        #NEXTGAMIS Cloud, and that is what the operator is watching. The
+        #'dropbox' data_source argument keeps its name - it is the public API.
+        self._p("Fetching data from cloud ...")
         url = self.file_url
         urllib.request.urlretrieve(url, self.file_name)
         df = pd.read_csv(self.file_name)

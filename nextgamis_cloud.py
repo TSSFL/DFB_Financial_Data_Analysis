@@ -184,7 +184,7 @@ class FinancialReport:
         df = pd.read_csv(self.file_name)
         #Date normalisation used to happen here, and only here. It is now applied to
         #every source from __init__ - see _normalise_source_dates.
-        self._p("Data loaded: {} rows, {} columns".format(len(df), len(df.columns)), done=True)
+        self._p("Data loaded ...", done=True)
         return df
         
     #KoboToolbox returns one page of submissions per request. 2000 is well above
@@ -443,8 +443,7 @@ class FinancialReport:
             pass          #unsorted is still complete; every report sorts by date anyway
 
         self.df = pd.DataFrame(rows)   #Avoid self.df is referencing outside this method
-        self._p("Data loaded: {} rows, {} columns".format(len(self.df),
-                                                          len(self.df.columns)),
+        self._p("Data loaded ...",
                 done=True, sub="Kobo asset {!r}".format(asset.get('name')))
         self.df = self._kobo_to_abs(self.df)
         self.df_copy = self.df.copy()  #Create a copy of the original dataframe
@@ -1698,7 +1697,7 @@ class FinancialReport:
     ABS_NON_PROVIDER = {
         'Timestamp', 'Name of Submitter', 'Date of Transaction', 'Date of Submission',
         'MOBILE BUNDLES COMM and SHARES', 'CAPITAL INFUSION', 'SALARIES', 'EXPENDITURES',
-        'TRANSFER FEES', 'HARD CASH', 'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID',
+        'TRANSFER FEES', 'HARD CASH', 'CREDIT', 'CREDIT PAID', 'DEBIT', 'DEBIT PAID',
         'INCIDENTS', 'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW', 'DAY NAME',
         'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
         'EXCESS', 'LOSS', 'EXCESS/LOSS', 'S/N',
@@ -1711,8 +1710,8 @@ class FinancialReport:
 
     ABS_TEXT_FIELDS = ['MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
                        'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details',
-                       'CREDIT Details', 'DEBIT Details', 'CREDIT PAID Details',
-                       'DEBIT PAID Details',
+                       'CREDIT Details', 'CREDIT PAID Details',
+                       'DEBIT Details', 'DEBIT PAID Details',
                        'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
 
     # ── Column naming ─────────────────────────────────────────────────────────
@@ -1762,11 +1761,7 @@ class FinancialReport:
 
     def normalise_columns(self, df):
         """Rename every column to ABS naming, and report unrostered providers."""
-        before = list(df.columns)
         df = df.rename(columns={c: self.normalise_column(c) for c in df.columns})
-        renamed = sum(1 for a, b in zip(before, df.columns) if a != b)
-        self._p("Columns normalised to ABS naming",
-                sub="{} columns, {} renamed".format(len(df.columns), renamed))
         #ABS calls the submission stamp 'Date of Submission'; the forms emit 'Timestamp'.
         if 'Timestamp' in df.columns and 'Date of Submission' not in df.columns:
             df = df.rename(columns={'Timestamp': 'Date of Submission'})
@@ -1920,7 +1915,7 @@ class FinancialReport:
               'TOTAL BANK COMMISSION', 'TOTAL COMMISSION',
               'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
               'EXCESS', 'LOSS', 'EXCESS/LOSS',
-              'CREDIT', 'DEBIT', 'CREDIT PAID', 'DEBIT PAID']
+              'CREDIT', 'CREDIT PAID', 'DEBIT', 'DEBIT PAID']
         g7 = list(self.ABS_TEXT_FIELDS)
 
         return g1 + g2 + g3 + g4 + g5 + g6 + g7
@@ -2148,10 +2143,19 @@ class FinancialReport:
         mins = mins.where(maxs.abs() > _ZERO_TOL, 0.0)
 
         allow_sum = ['COMM', 'SALARIES', 'EXPENDITURES', 'INFUSION', 'FEES', 'TOTAL CASH',
-                     'EXCESS', 'LOSS', 'CREDIT', 'DEBIT', 'SHARES', 'HARD CASH']
+                     'EXCESS', 'LOSS', 'CREDIT', 'DEBIT', 'SHARES']
         for col in numeric_cols:
             is_flow = any(kw in col for kw in allow_sum)
-            is_balance = 'FLOAT' in col or 'OPERATING CAPITAL' in col
+            #HARD CASH is a balance, not a flow. Cash and float are two forms of
+            #the same capital and the counter swaps between them all day - a
+            #customer hands over cash to take float, the next hands over float
+            #to take cash - so the closing figure is a position, not something
+            #that accumulates. Adding it down the column totals a quantity that
+            #was never earned or spent. ACTUAL OPERATING CAPITAL = HARD CASH +
+            #TOTAL FLOAT says the same thing: it belongs with TOTAL FLOAT,
+            #which has always been excluded here.
+            is_balance = ('FLOAT' in col or 'OPERATING CAPITAL' in col
+                          or 'HARD CASH' in col)
             if not is_flow or is_balance:
                 sums[col] = np.nan
 
@@ -2599,10 +2603,7 @@ class FinancialReport:
             if filtered.empty:
                 cache[key] = (None, desc)
             else:
-                self._p("{}: {} submissions across {} date(s)".format(
-                            desc, len(filtered),
-                            filtered['Date of Transaction'].dt.date.nunique()),
-                        sub="Totals and reconciliation computed")
+                self._p("Totals and reconciliation computed")
                 cache[key] = (self.abs_run_calculations(filtered), desc)
         return cache[key]
 
@@ -2637,7 +2638,7 @@ class FinancialReport:
         out = output_file or self._abs_outfile(slug_base, desc, company_name)
         self.abs_generate_html_report(final, title, desc,
                                       company_name=company_name, output_file=out)
-        self._p("{} \u00b7 {} \u00b7 {} rows".format(title, desc, len(final)),
+        self._p("{} \u00b7 {}".format(title, desc),
                 done=True, meta=self._size_time(out, _t0))
         return out
 
@@ -2718,7 +2719,7 @@ class FinancialReport:
         out = output_file or self._abs_outfile('Daily_Snapshot', target.replace('/', '-'), company_name)
         self.abs_generate_html_report(final, 'Daily Snapshot', desc,
                                       company_name=company_name, output_file=out)
-        self._p("Daily Snapshot \u00b7 {} \u00b7 {} rows".format(target, len(final)),
+        self._p("Daily Snapshot \u00b7 {}".format(target),
                 done=True, meta=self._size_time(out, _t0))
         return out
 

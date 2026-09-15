@@ -2768,7 +2768,11 @@ class FinancialReport:
 
     # ── Report 7: Quick Report (single date, 4 columns) ───────────────────────
 
-    ABS_SPECIAL_DETAIL = {'MOBILE BUNDLES COMM and SHARES': 'MOBILE BUNDLES and SHARES Details'}
+    #Merchant numbers in use today are mobile (LIPA), so their earnings sit
+    #beside TOTAL LIPA MOBILE COMMISSION; bank merchant numbers will get columns
+    #of their own when they arrive.
+    ABS_SPECIAL_DETAIL = {'MOBILE BUNDLES COMM and SHARES': 'MOBILE BUNDLES and SHARES Details',
+                          'TOTAL LIPA MOBILE COMMISSION': 'MERCHANT NUMBERS Earnings Details'}
 
     def quick_report(self, date=None, company_name=None, fmt='html', output_file=None):
         """Report 7 - one date as # | Description | Amount (TZS) | Details.
@@ -2819,10 +2823,7 @@ class FinancialReport:
 
         zone_c = ['ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
                   'EXCESS', 'LOSS', 'EXCESS/LOSS']
-        #Merchant-number earnings cover mobile and bank merchant numbers alike,
-        #so they get a row of their own rather than one provider's Details cell.
-        zone_b = ['MERCHANT NUMBERS Earnings Details',
-                  'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
+        zone_b = ['Transaction Anomalies and Irregularities Details', 'INCIDENTS']
         g1 = {'Date of Submission', 'Name of Submitter', 'Date of Transaction'}
         zone_a = [c for c in all_cols if c not in g1 and c not in zone_c and c not in zone_b
                   and 'Details' not in c and c != 'INCIDENTS']
@@ -2834,6 +2835,12 @@ class FinancialReport:
                 continue
             d = detail_col_for(col)
             rows.append(('a', col, val, get_text(d) if d else ''))
+        #The merchant-number earnings sit beside TOTAL LIPA MOBILE COMMISSION
+        #(ABS_SPECIAL_DETAIL). On a day that total is zero its row is not shown,
+        #so the text gets a row of its own rather than vanish.
+        merchant = 'MERCHANT NUMBERS Earnings Details'
+        if get_text(merchant) and not any(r[1] == 'TOTAL LIPA MOBILE COMMISSION' for r in rows):
+            rows.append(('b', merchant, None, get_text(merchant)))
         for col in zone_b:
             t = get_text(col)
             if t:

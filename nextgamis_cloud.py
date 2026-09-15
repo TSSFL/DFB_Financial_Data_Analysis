@@ -1059,7 +1059,9 @@ class FinancialReport:
              
          #LIPA MOBILE FLOAT TOTAL
          #Keywords to exclude
-         exclude_keywords = ["COMM", "TOTAL"]
+         #"Details": a text column must never be summed. None carries LIPA
+         #today, but this filter would take one in by its name alone.
+         exclude_keywords = ["COMM", "TOTAL", "Details"]
          include_keyword = "LIPA"
  
          #Columns to sum for "LIPA MOBILE FLOAT TOTAL"
@@ -1110,7 +1112,7 @@ class FinancialReport:
              pass  #absent provider block is normal - each agent carries a different mix
 
          #LIPA MOBILE COMMISSION TOTAL
-         lipa_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["LIPA", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
+         lipa_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["LIPA", "COMM"]) and all(kw not in col for kw in ["TOTAL", "Details"])]
          if lipa_comm_cols:
              self.df['TOTAL LIPA MOBILE COMMISSION'] = self.df[lipa_comm_cols].sum(axis=1)   
          else:
@@ -1228,6 +1230,10 @@ class FinancialReport:
          #Check if 'MOBILE BUNDLES and SHARES Details' exists and add it to the list of cols_to_right
          if 'MOBILE BUNDLES and SHARES Details' in self.df.columns:
              cols_to_right.insert(4, 'MOBILE BUNDLES and SHARES Details')
+         #First of the Details once the form carries it - responses from before
+         #the question was added do not, and a missing name here is a KeyError
+         if 'MERCHANT NUMBERS Earnings Details' in self.df.columns:
+             cols_to_right.insert(0, 'MERCHANT NUMBERS Earnings Details')
          other_cols = [col for col in self.df.columns if col not in cols_to_left + cols_to_right]
 
          self.df = self.df[cols_to_left + other_cols + cols_to_right]
@@ -1704,6 +1710,9 @@ class FinancialReport:
         'INCIDENTS', 'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW', 'DAY NAME',
         'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
         'EXCESS', 'LOSS', 'EXCESS/LOSS', 'S/N',
+        #Only feeds the Kobo name index: a Kobo field merchant_numbers_earnings_details
+        #takes this exact spelling instead of 'MERCHANT NUMBERS EARNINGS Details'
+        'MERCHANT NUMBERS Earnings Details',
     }
 
     #Short labels: the summary block sits in the sticky first column, so its
@@ -1711,7 +1720,11 @@ class FinancialReport:
     #enough to crowd out the data on a phone.
     ABS_SUMMARY_LABELS = ('TOTALS', 'AVERAGE', 'MAXIMUM', 'MINIMUM')
 
-    ABS_TEXT_FIELDS = ['MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
+    #MERCHANT NUMBERS Earnings Details: earnings on merchant (LIPA) numbers,
+    #mobile and bank alike, as one free-text entry - first of the Details. The
+    #name contains none of the words the totals select columns by.
+    ABS_TEXT_FIELDS = ['MERCHANT NUMBERS Earnings Details',
+                       'MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
                        'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details',
                        'CREDIT Details', 'CREDIT PAID Details',
                        'DEBIT Details', 'DEBIT PAID Details',
@@ -2806,7 +2819,10 @@ class FinancialReport:
 
         zone_c = ['ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
                   'EXCESS', 'LOSS', 'EXCESS/LOSS']
-        zone_b = ['Transaction Anomalies and Irregularities Details', 'INCIDENTS']
+        #Merchant-number earnings cover mobile and bank merchant numbers alike,
+        #so they get a row of their own rather than one provider's Details cell.
+        zone_b = ['MERCHANT NUMBERS Earnings Details',
+                  'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
         g1 = {'Date of Submission', 'Name of Submitter', 'Date of Transaction'}
         zone_a = [c for c in all_cols if c not in g1 and c not in zone_c and c not in zone_b
                   and 'Details' not in c and c != 'INCIDENTS']

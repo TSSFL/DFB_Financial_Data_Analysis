@@ -1918,18 +1918,55 @@ class FinancialReport:
                 if (n_cnt > 0 and sa_cnt > 0) or (n_cnt > 1 or sa_cnt > 1):
                     g4.append("{} GRAND TOTAL COMM".format(key))
 
-        g3 = ['TOTAL NORMAL MOBILE FLOAT', 'TOTAL SUPERAGENT MOBILE FLOAT',
-              'TOTAL LIPA MOBILE FLOAT', 'SELCOM FLOAT TOTAL', 'TOTAL AGENCY FLOAT',
-              'TOTAL NORMAL BANK FLOAT', 'TOTAL SUPERAGENT BANK FLOAT',
-              'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT', 'TOTAL FLOAT']
+        # A roll-up is listed only when it has something to roll up.
+        #
+        # g2 and g4 above are already built from the accounts discovered in the
+        # data - a provider absent from the data gets no columns. g3 and g6
+        # were flat lists, so every family total was named whatever the shop
+        # actually ran, and `reindex(columns=master, fill_value=0.0)` then
+        # created it. DIGITAL FINANCIAL BRIDGE has no agency accounts at all
+        # and its report still carried TOTAL AGENCY FLOAT and TOTAL AGENCY
+        # COMMISSION, summing nothing, reported 2026-09-29.
+        present  = set(n_max) | set(s_max)
+        mobile   = [b for b in (self.MOBILE_POOL + extra) if 'LIPA' not in b]
+        has_lipa   = any('LIPA' in b for b in present)
+        has_selcom = self.SELCOM in present
+        has_agency = any(b in present for b in self.AGENCY_POOL)
+        has_bank_n = any(b in n_max for b in self.BANK_POOL)
+        has_bank_s = any(b in s_max for b in self.BANK_POOL)
+        has_mob_n  = any(b in n_max for b in mobile)
+        has_mob_s  = any(b in s_max for b in mobile)
+        has_bank   = has_bank_n or has_bank_s
+        has_mobile = has_mob_n or has_mob_s or has_lipa
+
+        def _keep(pairs):
+            return [name for name, wanted in pairs if wanted]
+
+        g3 = _keep([
+            ('TOTAL NORMAL MOBILE FLOAT',     has_mob_n),
+            ('TOTAL SUPERAGENT MOBILE FLOAT', has_mob_s),
+            ('TOTAL LIPA MOBILE FLOAT',       has_lipa),
+            ('SELCOM FLOAT TOTAL',            has_selcom),
+            ('TOTAL AGENCY FLOAT',            has_agency),
+            ('TOTAL NORMAL BANK FLOAT',       has_bank_n),
+            ('TOTAL SUPERAGENT BANK FLOAT',   has_bank_s),
+            ('TOTAL MOBILE FLOAT',            has_mobile),
+            ('TOTAL BANK FLOAT',              has_bank),
+            ('TOTAL FLOAT',                   True),
+        ])
         g5 = ['MOBILE BUNDLES COMM and SHARES', 'CAPITAL INFUSION', 'SALARIES',
               'EXPENDITURES', 'TRANSFER FEES', 'HARD CASH',
               'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW']
-        g6 = ['TOTAL NORMAL MOBILE COMMISSION', 'TOTAL LIPA MOBILE COMMISSION',
-              'TOTAL SELCOM COMMISSION', 'TOTAL NORMAL BANK COMMISSION',
-              'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
-              'TOTAL BANK COMMISSION', 'TOTAL COMMISSION',
-              'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
+        g6 = _keep([
+            ('TOTAL NORMAL MOBILE COMMISSION', has_mob_n),
+            ('TOTAL LIPA MOBILE COMMISSION',   has_lipa),
+            ('TOTAL SELCOM COMMISSION',        has_selcom),
+            ('TOTAL NORMAL BANK COMMISSION',   has_bank_n),
+            ('TOTAL AGENCY COMMISSION',        has_agency),
+            ('TOTAL MOBILE COMMISSION',        has_mobile),
+            ('TOTAL BANK COMMISSION',          has_bank),
+            ('TOTAL COMMISSION',               True),
+        ]) + ['ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
               'EXCESS', 'LOSS', 'EXCESS/LOSS',
               'CREDIT', 'CREDIT PAID', 'DEBIT', 'DEBIT PAID']
         g7 = list(self.ABS_TEXT_FIELDS)
@@ -1991,33 +2028,46 @@ class FinancialReport:
                 if exclude and any(k in u for k in exclude):
                     continue
                 sel.append(c)
-            return df[sel].sum(axis=1) if sel else 0.0
+            return df[sel].sum(axis=1) if sel else None
+
+        def _put(name, **kw):
+            """Assign a roll-up only when something rolls up into it.
+
+            _sum() used to answer the scalar 0.0 when no column matched, and
+            `df[name] = 0.0` broadcasts that into a brand-new column -- so a
+            family the shop does not run still got its total, reading 0.00 in
+            every row. It now answers None and the column is simply not made.
+            The master list above drops the same names, so order and presence
+            agree rather than being decided twice.
+            """
+            s = _sum(**kw)
+            if s is not None:
+                df[name] = s
 
         base_ex = ['INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'HARD',
                    'TIMESTAMP', 'SUBMITTER', 'DETAILS', 'INCIDENTS', 'DATE',
                    'CREDIT', 'DEBIT']
 
-        df['TOTAL NORMAL MOBILE FLOAT']     = _sum(exclude=['BANK', 'COMM', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'] + base_ex)
-        df['TOTAL SUPERAGENT MOBILE FLOAT'] = _sum(include_all=['SUPERAGENT'], exclude=['BANK', 'COMM', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM'])
-        df['TOTAL LIPA MOBILE FLOAT']       = _sum(include_all=['LIPA'], exclude=['COMM', 'TOTAL', 'GRAND'])
-        df['SELCOM FLOAT TOTAL']            = _sum(include_all=['SELCOM'], exclude=['COMM', 'TOTAL', 'GRAND'])
-        df['TOTAL NORMAL BANK FLOAT']       = _sum(include_all=['BANK'], exclude=['SUPERAGENT', 'TOTAL', 'COMM', 'GRAND'])
-        df['TOTAL AGENCY FLOAT']            = _sum(include_all=['AGENCY'], exclude=['COMM', 'TOTAL', 'GRAND'])
-        df['TOTAL SUPERAGENT BANK FLOAT']   = _sum(include_all=['BANK', 'SUPERAGENT'], exclude=['TOTAL', 'COMM', 'GRAND'])
-        df['TOTAL MOBILE FLOAT']            = _sum(exclude=['BANK', 'TOTAL', 'GRAND', 'COMM', 'SELCOM', 'AGENCY', 'TRANSACTION'] + base_ex)
-        df['TOTAL BANK FLOAT']              = _sum(include_all=['BANK'], exclude=['TOTAL', 'GRAND', 'COMM'])
-        df['TOTAL FLOAT']                   = _sum(exclude=['COMM', 'TOTAL', 'GRAND', 'TRANSACTION'] + base_ex)
-
-        df['TOTAL NORMAL MOBILE COMMISSION']     = _sum(include_all=['COMM'], exclude=['BANK', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
-        df['TOTAL SUPERAGENT MOBILE COMMISSION'] = _sum(include_all=['SUPERAGENT', 'COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'])
-        df['TOTAL LIPA MOBILE COMMISSION']       = _sum(include_all=['LIPA', 'COMM'], exclude=['TOTAL', 'GRAND'])
-        df['TOTAL SELCOM COMMISSION']            = _sum(include_all=['SELCOM', 'COMM'], exclude=['TOTAL', 'GRAND'])
-        df['TOTAL NORMAL BANK COMMISSION']       = _sum(include_all=['BANK', 'COMM'], exclude=['SUPERAGENT', 'TOTAL', 'GRAND'])
-        df['TOTAL AGENCY COMMISSION']            = _sum(include_all=['AGENCY', 'COMM'], exclude=['TOTAL', 'GRAND'])
-        df['TOTAL SUPERAGENT BANK COMMISSION']   = _sum(include_all=['BANK', 'SUPERAGENT', 'COMM'], exclude=['TOTAL', 'GRAND'])
-        df['TOTAL MOBILE COMMISSION']            = _sum(include_all=['COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
-        df['TOTAL BANK COMMISSION']              = _sum(include_all=['BANK', 'COMM'], exclude=['TOTAL', 'GRAND'])
-        df['TOTAL COMMISSION']                   = _sum(include_all=['COMM'], exclude=['TOTAL', 'GRAND', 'DETAILS'])
+        _put('TOTAL NORMAL MOBILE FLOAT', exclude=['BANK', 'COMM', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'] + base_ex)
+        _put('TOTAL SUPERAGENT MOBILE FLOAT', include_all=['SUPERAGENT'], exclude=['BANK', 'COMM', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM'])
+        _put('TOTAL LIPA MOBILE FLOAT', include_all=['LIPA'], exclude=['COMM', 'TOTAL', 'GRAND'])
+        _put('SELCOM FLOAT TOTAL', include_all=['SELCOM'], exclude=['COMM', 'TOTAL', 'GRAND'])
+        _put('TOTAL NORMAL BANK FLOAT', include_all=['BANK'], exclude=['SUPERAGENT', 'TOTAL', 'COMM', 'GRAND'])
+        _put('TOTAL AGENCY FLOAT', include_all=['AGENCY'], exclude=['COMM', 'TOTAL', 'GRAND'])
+        _put('TOTAL SUPERAGENT BANK FLOAT', include_all=['BANK', 'SUPERAGENT'], exclude=['TOTAL', 'COMM', 'GRAND'])
+        _put('TOTAL MOBILE FLOAT', exclude=['BANK', 'TOTAL', 'GRAND', 'COMM', 'SELCOM', 'AGENCY', 'TRANSACTION'] + base_ex)
+        _put('TOTAL BANK FLOAT', include_all=['BANK'], exclude=['TOTAL', 'GRAND', 'COMM'])
+        _put('TOTAL FLOAT', exclude=['COMM', 'TOTAL', 'GRAND', 'TRANSACTION'] + base_ex)
+        _put('TOTAL NORMAL MOBILE COMMISSION', include_all=['COMM'], exclude=['BANK', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
+        _put('TOTAL SUPERAGENT MOBILE COMMISSION', include_all=['SUPERAGENT', 'COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'])
+        _put('TOTAL LIPA MOBILE COMMISSION', include_all=['LIPA', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        _put('TOTAL SELCOM COMMISSION', include_all=['SELCOM', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        _put('TOTAL NORMAL BANK COMMISSION', include_all=['BANK', 'COMM'], exclude=['SUPERAGENT', 'TOTAL', 'GRAND'])
+        _put('TOTAL AGENCY COMMISSION', include_all=['AGENCY', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        _put('TOTAL SUPERAGENT BANK COMMISSION', include_all=['BANK', 'SUPERAGENT', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        _put('TOTAL MOBILE COMMISSION', include_all=['COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
+        _put('TOTAL BANK COMMISSION', include_all=['BANK', 'COMM'], exclude=['TOTAL', 'GRAND'])
+        _put('TOTAL COMMISSION', include_all=['COMM'], exclude=['TOTAL', 'GRAND', 'DETAILS'])
 
         df['ACTUAL OPERATING CAPITAL'] = df['HARD CASH'] + df['TOTAL FLOAT']
 

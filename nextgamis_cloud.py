@@ -2494,8 +2494,22 @@ class FinancialReport:
 
         AMBER, RED, GREEN = '#E65100', '#C62828', '#1B5E20'
         date_col = 'Date of Transaction' if 'Date of Transaction' in fdf.columns else fdf.columns[0]
-        multi_dates = fdf[fdf.duplicated(subset=[date_col], keep=False)][date_col].unique()
         summary_labels = list(self.ABS_SUMMARY_LABELS)
+
+        #A summary row carries its label in the FIRST column and blanks in every
+        #other - which is the date column only on reports that lead with the
+        #date. The Daily Snapshot leads with Reporting Date, so its four summary
+        #rows hold '' in Date of Transaction: four identical values that
+        #duplicated() reads as one date submitted four times. Each summary row
+        #then looked like an individual counter on a multi-entry day and had its
+        #reconciliation figures blanked, so AVERAGE, MAXIMUM and MINIMUM came out
+        #empty for EXPECTED OPERATING CAPITAL, EXCESS, LOSS and EXCESS/LOSS.
+        #Fixed in ABS 2026-09-30 and mirrored here 2026-10-01, reported on a
+        #real Cloud snapshot. Identify the rows and keep them out of both tests,
+        #rather than testing whether a date cell happens to hold a label.
+        is_summary = fdf[fdf.columns[0]].astype(str).isin(summary_labels)
+        _body = fdf[~is_summary]
+        multi_dates = _body[_body.duplicated(subset=[date_col], keep=False)][date_col].unique()
 
         #This was a row loop over .at[] - fourteen scalar gets and sets per row,
         #every one of them a full indexing round trip through the block manager.
@@ -2521,7 +2535,7 @@ class FinancialReport:
         #of their own - only the COMBINED row does - so blank them out.
         blank = (tdate_s.isin(multi_dates)
                  & ~sub_s.str.startswith('COMBINED')
-                 & ~tdate_s.isin(summary_labels))
+                 & ~is_summary)
         for col in ['EXPECTED OPERATING CAPITAL', 'EXCESS', 'LOSS', 'EXCESS/LOSS']:
             if col in fdf.columns:
                 fdf.loc[blank, col] = ''

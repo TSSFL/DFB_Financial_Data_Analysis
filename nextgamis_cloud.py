@@ -1076,12 +1076,11 @@ class FinancialReport:
          else:
              pass  #absent provider block is normal - each agent carries a different mix
        
-         #TOTAL SELCOM FLOAT
-         selcom_cols = [col for col in self.df.columns if "SELCOM" in col and all(kw not in col for kw in ["COMM", "TOTAL"])]
-         if selcom_cols:
-             self.df['SELCOM FLOAT TOTAL'] = self.df[selcom_cols].sum(axis=1)  
-         else:
-             pass  #absent provider block is normal - each agent carries a different mix
+         # No family total for Selcom: it is one provider carrying the
+         # normal/superagent split, so SELCOM GRAND TOTAL FLOAT and
+         # SELCOM GRAND TOTAL COMM already are the family totals. The two
+         # family columns duplicated them exactly and were dropped
+         # 2026-09-30; they dated from when Selcom had no superagents.
  
          #NORMAL BANK FLOAT TOTAL
          bank_cols = [col for col in self.df.columns if "BANK" in col and all(kw not in col for kw in ["SUPERAGENT", "TOTAL", "COMM"])]
@@ -1118,12 +1117,6 @@ class FinancialReport:
          else:
              pass  #absent provider block is normal - each agent carries a different mix
 
-         #TOTAL SELCOM COMMISSION
-         selcom_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["SELCOM", "COMM"]) and all(kw not in col for kw in ["TOTAL"])]
-         if selcom_comm_cols:
-             self.df['TOTAL SELCOM COMMISSION'] = self.df[selcom_comm_cols].sum(axis=1)   
-         else:
-             pass  #absent provider block is normal - each agent carries a different mix
 
          #NORMAL BANK COMMISSION TOTAL
          bank_comm_cols = [col for col in self.df.columns if all(kw in col for kw in ["BANK", "COMM"]) and all(kw not in col for kw in ["SUPERAGENT", "TOTAL"])]
@@ -1946,7 +1939,6 @@ class FinancialReport:
             ('TOTAL NORMAL MOBILE FLOAT',     has_mob_n),
             ('TOTAL SUPERAGENT MOBILE FLOAT', has_mob_s),
             ('TOTAL LIPA MOBILE FLOAT',       has_lipa),
-            ('SELCOM FLOAT TOTAL',            has_selcom),
             ('TOTAL AGENCY FLOAT',            has_agency),
             ('TOTAL NORMAL BANK FLOAT',       has_bank_n),
             ('TOTAL SUPERAGENT BANK FLOAT',   has_bank_s),
@@ -1960,7 +1952,6 @@ class FinancialReport:
         g6 = _keep([
             ('TOTAL NORMAL MOBILE COMMISSION', has_mob_n),
             ('TOTAL LIPA MOBILE COMMISSION',   has_lipa),
-            ('TOTAL SELCOM COMMISSION',        has_selcom),
             ('TOTAL NORMAL BANK COMMISSION',   has_bank_n),
             ('TOTAL AGENCY COMMISSION',        has_agency),
             ('TOTAL MOBILE COMMISSION',        has_mobile),
@@ -2051,7 +2042,6 @@ class FinancialReport:
         _put('TOTAL NORMAL MOBILE FLOAT', exclude=['BANK', 'COMM', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'] + base_ex)
         _put('TOTAL SUPERAGENT MOBILE FLOAT', include_all=['SUPERAGENT'], exclude=['BANK', 'COMM', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM'])
         _put('TOTAL LIPA MOBILE FLOAT', include_all=['LIPA'], exclude=['COMM', 'TOTAL', 'GRAND'])
-        _put('SELCOM FLOAT TOTAL', include_all=['SELCOM'], exclude=['COMM', 'TOTAL', 'GRAND'])
         _put('TOTAL NORMAL BANK FLOAT', include_all=['BANK'], exclude=['SUPERAGENT', 'TOTAL', 'COMM', 'GRAND'])
         _put('TOTAL AGENCY FLOAT', include_all=['AGENCY'], exclude=['COMM', 'TOTAL', 'GRAND'])
         _put('TOTAL SUPERAGENT BANK FLOAT', include_all=['BANK', 'SUPERAGENT'], exclude=['TOTAL', 'COMM', 'GRAND'])
@@ -2061,7 +2051,6 @@ class FinancialReport:
         _put('TOTAL NORMAL MOBILE COMMISSION', include_all=['COMM'], exclude=['BANK', 'SUPERAGENT', 'LIPA', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY', 'DETAILS'])
         _put('TOTAL SUPERAGENT MOBILE COMMISSION', include_all=['SUPERAGENT', 'COMM'], exclude=['BANK', 'TOTAL', 'GRAND', 'SELCOM', 'AGENCY'])
         _put('TOTAL LIPA MOBILE COMMISSION', include_all=['LIPA', 'COMM'], exclude=['TOTAL', 'GRAND'])
-        _put('TOTAL SELCOM COMMISSION', include_all=['SELCOM', 'COMM'], exclude=['TOTAL', 'GRAND'])
         _put('TOTAL NORMAL BANK COMMISSION', include_all=['BANK', 'COMM'], exclude=['SUPERAGENT', 'TOTAL', 'GRAND'])
         _put('TOTAL AGENCY COMMISSION', include_all=['AGENCY', 'COMM'], exclude=['TOTAL', 'GRAND'])
         _put('TOTAL SUPERAGENT BANK COMMISSION', include_all=['BANK', 'SUPERAGENT', 'COMM'], exclude=['TOTAL', 'GRAND'])
@@ -2641,7 +2630,7 @@ class FinancialReport:
             prov_totals = [c for c in fdf.columns if any(
                 x in c for x in ['NORMAL COMM TOTAL', 'SUPERAGENT COMM TOTAL', 'GRAND TOTAL COMM'])]
             grand = ['TOTAL NORMAL MOBILE COMMISSION', 'TOTAL LIPA MOBILE COMMISSION',
-                     'TOTAL SELCOM COMMISSION', 'TOTAL NORMAL BANK COMMISSION',
+                     'SELCOM GRAND TOTAL COMM', 'TOTAL NORMAL BANK COMMISSION',
                      'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
                      'TOTAL BANK COMMISSION']
             agg = [c for c in dict.fromkeys(comm_cols + prov_totals + grand) if c in fdf.columns]
@@ -2656,7 +2645,7 @@ class FinancialReport:
         elif mode == 'mini':
             include = ['Date of Transaction', 'Date of Submission', 'Name of Submitter',
                        'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT', 'TOTAL FLOAT',
-                       'SELCOM FLOAT TOTAL', 'HARD CASH', 'ACTUAL OPERATING CAPITAL',
+                       'SELCOM GRAND TOTAL FLOAT', 'HARD CASH', 'ACTUAL OPERATING CAPITAL',
                        'EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS']
             fdf = fdf[[c for c in fdf.columns if c in include]]
         elif mode == 'compact':

@@ -911,8 +911,25 @@ class FinancialReport:
         return final_html
     
     def mini_report(self, df):
-        mini_df = df[['Date of Transaction'] + list(df.loc[:, 'ACTUAL OPERATING CAPITAL':'DEBIT PAID'].columns)]
-        return mini_df
+        """The same columns as ABS's Mini Totals, so the two agree (2026-10-01).
+
+        This took a POSITIONAL slice -- df.loc[:, 'ACTUAL OPERATING CAPITAL':
+        'DEBIT PAID'] -- which carried every column that happened to sit between
+        those two and therefore no float family at all: no mobile, bank, Selcom
+        or agency total, no TOTAL FLOAT, no HARD CASH. It also depended on
+        column order, so inserting a column between those bounds would silently
+        change the report without touching this line.
+
+        Named and filtered by membership instead, exactly as abs_slice_report()
+        does: the comprehension walks df.columns, so order comes from the frame
+        and a family this shop does not run is absent rather than an error.
+        """
+        include = ['Date of Transaction', 'Date of Submission', 'Name of Submitter',
+                   'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT',
+                   'SELCOM GRAND TOTAL FLOAT', 'TOTAL AGENCY FLOAT', 'TOTAL FLOAT',
+                   'HARD CASH', 'ACTUAL OPERATING CAPITAL',
+                   'EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS']
+        return df[[c for c in df.columns if c in include]]
             
     #This method is for brief report - select a df subset
     def subset_df(self, df):

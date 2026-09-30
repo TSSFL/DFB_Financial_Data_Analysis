@@ -2643,9 +2643,14 @@ class FinancialReport:
             res['S/N'] = range(1, len(res) + 1)
             return res
         elif mode == 'mini':
+            # Every float family the shop can hold, so the mini report accounts
+            # for all of TOTAL FLOAT rather than most of it. TOTAL AGENCY FLOAT
+            # was missing (2026-09-30). The comprehension walks fdf.columns, so
+            # a family this shop does not run is simply absent, not an error.
             include = ['Date of Transaction', 'Date of Submission', 'Name of Submitter',
-                       'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT', 'TOTAL FLOAT',
-                       'SELCOM GRAND TOTAL FLOAT', 'HARD CASH', 'ACTUAL OPERATING CAPITAL',
+                       'TOTAL MOBILE FLOAT', 'TOTAL BANK FLOAT',
+                       'SELCOM GRAND TOTAL FLOAT', 'TOTAL AGENCY FLOAT', 'TOTAL FLOAT',
+                       'HARD CASH', 'ACTUAL OPERATING CAPITAL',
                        'EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS']
             fdf = fdf[[c for c in fdf.columns if c in include]]
         elif mode == 'compact':

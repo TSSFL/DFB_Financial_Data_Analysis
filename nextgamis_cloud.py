@@ -929,6 +929,13 @@ class FinancialReport:
                    'SELCOM GRAND TOTAL FLOAT', 'TOTAL AGENCY FLOAT', 'TOTAL FLOAT',
                    'HARD CASH', 'ACTUAL OPERATING CAPITAL',
                    'EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS']
+        # Selcom's representative column -- see abs_slice_report('mini').
+        if 'SELCOM GRAND TOTAL FLOAT' not in df.columns:
+            include = include + [
+                c for c in df.columns
+                if c.upper().startswith('SELCOM')
+                and not any(k in c.upper()
+                            for k in ('COMM', 'TOTAL', 'GRAND', 'DETAIL'))]
         return df[[c for c in df.columns if c in include]]
             
     #This method is for brief report - select a df subset
@@ -2120,7 +2127,7 @@ class FinancialReport:
 
     # ── Date consolidation (port of ABS consolidate_by_date) ──────────────────
 
-    def abs_consolidate_by_date(self, df, is_snapshot=False):
+    def abs_consolidate_by_date(self, df, is_snapshot=False, master=None):
         df = df.copy()
         df['Date of Transaction'] = self._abs_parse_dates(
             df['Date of Transaction']).dt.strftime('%d/%m/%Y')
@@ -2175,7 +2182,17 @@ class FinancialReport:
 
         res = pd.DataFrame(final_rows)
         res['S/N'] = range(1, len(res) + 1)
-        master = self.abs_master_columns(res)
+        # ⚠️ The master must be derived from the UNSLICED frame. ABS reads it
+        # from sys_config.json, so no slice can affect it; the Cloud has no
+        # config and discovers the accounts from the data instead. Mini Totals
+        # slices down to twelve named columns first, which removes every
+        # provider account - so a master rebuilt here found no M-PESA, no bank,
+        # no Selcom and no agency, reported has_mobile/has_bank/has_agency as
+        # False, and named none of the family totals. The dashboard came out
+        # with TOTAL FLOAT and nothing that adds up to it (2026-10-01).
+        # Callers that slice pass the master computed before slicing.
+        if master is None:
+            master = self.abs_master_columns(res)
         head = (['Date of Submission'] if is_snapshot else []) + ['Date of Transaction', 'Name of Submitter']
         other = [c for c in master if c in res.columns and c not in head and c != 'S/N']
         return res[[c for c in (head + other + ['S/N']) if c in res.columns]]
@@ -2669,6 +2686,19 @@ class FinancialReport:
                        'SELCOM GRAND TOTAL FLOAT', 'TOTAL AGENCY FLOAT', 'TOTAL FLOAT',
                        'HARD CASH', 'ACTUAL OPERATING CAPITAL',
                        'EXPECTED OPERATING CAPITAL', 'EXCESS/LOSS']
+            # Selcom's representative column, whichever form it takes: the
+            # grand total where the provider has more than one account, and the
+            # single account itself where it does not -- with one account the
+            # convention gives no grand total, because the account IS the total.
+            # Without this the families fall short of TOTAL FLOAT by exactly
+            # that account (live data, 2026-10-01: MOBILE + BANK 9,489,320 vs
+            # TOTAL FLOAT 13,225,487, the difference being SELCOM 1 exactly).
+            if 'SELCOM GRAND TOTAL FLOAT' not in fdf.columns:
+                include = include + [
+                    c for c in fdf.columns
+                    if c.upper().startswith('SELCOM')
+                    and not any(k in c.upper()
+                                for k in ('COMM', 'TOTAL', 'GRAND', 'DETAIL'))]
             fdf = fdf[[c for c in fdf.columns if c in include]]
         elif mode == 'compact':
             fdf = fdf[[c for c in fdf.columns if 'TOTAL' not in c]]
@@ -2735,7 +2765,9 @@ class FinancialReport:
         if mode == 'monthly_comm':
             final = self.abs_slice_report(calc, mode)
         elif mode:
-            final = self.abs_consolidate_by_date(self.abs_slice_report(calc, mode))
+            final = self.abs_consolidate_by_date(
+                self.abs_slice_report(calc, mode),
+                master=self.abs_master_columns(calc))
         else:
             final = self.abs_consolidate_by_date(calc)
 

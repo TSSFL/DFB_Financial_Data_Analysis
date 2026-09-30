@@ -2372,24 +2372,37 @@ class FinancialReport:
         /* Hover only deepens the ground - the ink stays dark, so nothing can
            disappear. (The old rule repainted the navy index cell in a pale tint
            and left its white text invisible.) */
-        table.ngc tbody tr:hover td { background:#d6e4f6; color:#08182c; }
-        table.ngc tbody tr:hover td:first-child { background:#f7dfa4; color:#0B2A5B; }
+        /* The hover ground is WARM, deliberately. Every resting ground here is a
+           pale blue - white, #e9f0fa striping, #dfe8f4 summary - so a blue hover
+           (#d6e4f6) sat inside that family and read as barely different from an
+           unhovered row. #EADDCA is the tan ABS uses, and it is the only ground
+           in the table that is not blue, so the hovered row is unmistakable at a
+           glance and stays so while scrolling horizontally: :hover is on the tr,
+           and the sticky index cell keeps its own hovered fill. !important
+           because the striping and summary rules below are more specific.
+           Ink stays near-black either way, so no figure can wash out. */
+        table.ngc tbody tr:hover td { background:#EADDCA !important; color:#08182c !important; }
+        table.ngc tbody tr:hover td:first-child { background:#E3C489 !important; color:#0B2A5B !important; }
 
         /* Summary block reads as a footer, not as more data. */
         table.ngc tbody tr:nth-last-child(-n+4) td { background:#dfe8f4;
             font-weight:700; color:#08182c; border-top:2px solid #9fb4cd; }
         table.ngc tbody tr:nth-last-child(-n+4) td:first-child { background:#f4e3b4; }
-        table.ngc tbody tr:nth-last-child(-n+4):hover td { background:#d2e0f2; }
-        table.ngc tbody tr:nth-last-child(-n+4):hover td:first-child { background:#f7dfa4; }
+        table.ngc tbody tr:nth-last-child(-n+4):hover td { background:#EADDCA !important; }
+        table.ngc tbody tr:nth-last-child(-n+4):hover td:first-child { background:#E3C489 !important; }
 
         table.ngc tbody td:last-child { background:#f2f5f9; font-weight:700;
             text-align:center; color:#12386f; }
         table.ngc tbody td:nth-child(2), table.ngc tbody td:nth-child(3) {
             text-align:left; min-width:174px; }
-        /* The date column only has to hold dd/mm/yyyy and the short summary
-           labels; the header wraps onto two lines rather than setting the width. */
-        table.ngc thead th:first-child { min-width:118px; max-width:150px; }
-        table.ngc tbody td:first-child { min-width:118px; max-width:150px;
+        /* Wide enough for the widest thing the first column ever holds. That is
+           NOT dd/mm/yyyy: the Daily Snapshot leads with Reporting Date, a full
+           timestamp - "30/09/2026 20:03:05", nineteen characters - and with
+           white-space:nowrap a 150px cap clipped it against the column rule
+           (2026-10-01). 200px fits the timestamp with its padding; shorter
+           reports still size to their content, since this is a maximum. */
+        table.ngc thead th:first-child { min-width:118px; max-width:200px; }
+        table.ngc tbody td:first-child { min-width:118px; max-width:200px;
             white-space:nowrap; }
 
         .ngc-foot { background:%(deep)s; color:#c7d4e6; padding:18px 26px;

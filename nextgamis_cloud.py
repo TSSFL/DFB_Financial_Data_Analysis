@@ -2603,15 +2603,7 @@ class FinancialReport:
                 "Automated Agency Banking Reporting &nbsp;&copy; 2026 "
                 "<a href='https://www.tssfl.com'>TSSFL Technology Stack</a>").format(comp, stamp)
 
-        #A <title> so the browser tab, the bookmark and the suggested filename
-        #all read as the report rather than as whatever URL served it. It is the
-        #only part of the chrome a page controls: the address bar cannot be
-        #rewritten to another host, by design, so the tab is where the document
-        #gets to say what it is.
-        doc_title = "{} {} - {} - NEXTGAMIS".format(title, period_desc, comp).replace("  ", " ")
-
         html = ("<html><head><meta charset='utf-8'>"
-                "<title>{doc_title}</title>"
                 "<meta name='viewport' content='width=device-width, initial-scale=1'>"
                 "{css}<style>{detail}</style></head><body class='ngc-body'>"
                 "<div class='ngc-container'>"
@@ -2621,8 +2613,7 @@ class FinancialReport:
                 "<div class='ngc-band'>{band}</div>"
                 "<div class='ngc-foot'>{foot}</div>"
                 "</div></body></html>").format(css=css, detail=detail_css, band=band,
-                                               head=head, table=df_html, foot=foot,
-                                               doc_title=doc_title)
+                                               head=head, table=df_html, foot=foot)
         if output_file:
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(html)
@@ -3082,7 +3073,6 @@ class FinancialReport:
                'deep': self.HOUSE_DEEP, 'gold': self.HOUSE_GOLD}
 
         html = ("<html><head><meta charset='utf-8'>"
-                "<title>Quick Report {date} - {co} - NEXTGAMIS</title>"
                 "<meta name='viewport' content='width=device-width, initial-scale=1'>"
                 "{css}</head><body><div class='qr-wrap'>"
                 "<div class='qr-band'>{band}</div>"

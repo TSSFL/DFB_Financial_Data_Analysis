@@ -1975,8 +1975,17 @@ class FinancialReport:
               'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW']
         g6 = _keep([
             ('TOTAL NORMAL MOBILE COMMISSION', has_mob_n),
+            # ⚠️ The superagent commission totals were computed by _put() and
+            # declared nowhere, so neither became a column and neither reached a
+            # report -- while the float side (g3) declared both counterparts.
+            # On a shop with superagent accounts that leaves money inside TOTAL
+            # MOBILE COMMISSION and TOTAL BANK COMMISSION with no named part to
+            # explain it. Mirrored from ABS 2026-10-05, where 700,000 sat
+            # unaccounted in a report keyed from real data.
+            ('TOTAL SUPERAGENT MOBILE COMMISSION', has_mob_s),
             ('TOTAL LIPA MOBILE COMMISSION',   has_lipa),
             ('TOTAL NORMAL BANK COMMISSION',   has_bank_n),
+            ('TOTAL SUPERAGENT BANK COMMISSION', has_bank_s),
             ('TOTAL AGENCY COMMISSION',        has_agency),
             ('TOTAL MOBILE COMMISSION',        has_mobile),
             ('TOTAL BANK COMMISSION',          has_bank),
@@ -2690,8 +2699,11 @@ class FinancialReport:
                          and 'Details' not in c]
             prov_totals = [c for c in fdf.columns if any(
                 x in c for x in ['NORMAL COMM TOTAL', 'SUPERAGENT COMM TOTAL', 'GRAND TOTAL COMM'])]
-            grand = ['TOTAL NORMAL MOBILE COMMISSION', 'TOTAL LIPA MOBILE COMMISSION',
+            grand = ['TOTAL NORMAL MOBILE COMMISSION',
+                     'TOTAL SUPERAGENT MOBILE COMMISSION',
+                     'TOTAL LIPA MOBILE COMMISSION',
                      'SELCOM GRAND TOTAL COMM', 'TOTAL NORMAL BANK COMMISSION',
+                     'TOTAL SUPERAGENT BANK COMMISSION',
                      'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
                      'TOTAL BANK COMMISSION']
             agg = [c for c in dict.fromkeys(comm_cols + prov_totals + grand) if c in fdf.columns]

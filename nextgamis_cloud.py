@@ -2068,7 +2068,16 @@ class FinancialReport:
             if s is not None:
                 df[name] = s
 
-        base_ex = ['INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'HARD',
+        # ⚠️ CAPITAL / EXCESS / LOSS / S/N are excluded explicitly. They are
+        # real columns in the frame, carrying whatever is stored -- zero today,
+        # because nothing writes them and they are computed further down. The
+        # totals were therefore correct because two unrelated facts happened to
+        # hold, not because the rule said so: a value stored in any of them, or
+        # the capital block moving earlier, would have inflated every float
+        # total silently. S/N was being added as a shilling. Mirrored from ABS,
+        # 2026-10-05, where a test fixture seeding those columns exposed it.
+        base_ex = ['CAPITAL', 'EXCESS', 'LOSS', 'S/N',
+                   'INFUSION', 'TRANSFER', 'SALARIES', 'EXPENDITURES', 'HARD',
                    'TIMESTAMP', 'SUBMITTER', 'DETAILS', 'INCIDENTS', 'DATE',
                    'CREDIT', 'DEBIT']
 

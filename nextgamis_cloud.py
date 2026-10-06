@@ -2694,9 +2694,26 @@ class FinancialReport:
     def abs_slice_report(self, df, mode):
         fdf = df.copy()
         if mode == 'full_clean':
-            drop = [c for c in fdf.columns if 'TOTAL' in c and not any(
-                x in c for x in ['TOTAL NORMAL', 'TOTAL SUPERAGENT', 'TOTAL MOBILE',
-                                 'TOTAL BANK', 'TOTAL FLOAT', 'TOTAL CASH', 'TOTAL AGENCY'])]
+            # "Exclude Provider Totals" -- drop the per-provider roll-ups, keep
+            # every family and grand total. The naming convention draws that
+            # line, so ask the column its shape: a family total STARTS WITH
+            # 'TOTAL ', a provider total names its provider first.
+            #
+            # The old substring list kept one side of the ledger by accident
+            # (2026-10-06): 'TOTAL FLOAT' is a substring of 'AIRTEL MONEY GRAND
+            # TOTAL FLOAT', so every provider grand FLOAT total survived, while
+            # no token matched a commission one -- 16 of 22 dropped columns were
+            # commission, TOTAL COMMISSION among them. TOTAL LIPA MOBILE FLOAT
+            # went too, leaving TOTAL MOBILE FLOAT short by 2,265,057 on live
+            # ABS data. Mirrored from ABS src/engine.py.
+            #
+            # Selcom is the exception: it is its own family in the provider
+            # registry, holding one provider, so its family total is merely
+            # spelled with the provider's name. Drop it and TOTAL FLOAT has no
+            # Selcom term -- short by 158,677 of float, 300,000 of commission.
+            _family = ('TOTAL ', 'SELCOM ')
+            drop = [c for c in fdf.columns
+                    if 'TOTAL' in c.upper() and not c.upper().startswith(_family)]
             fdf.drop(columns=drop, inplace=True)
         elif mode == 'monthly_comm':
             fdf['Date of Transaction'] = self._abs_parse_dates(fdf['Date of Transaction'])

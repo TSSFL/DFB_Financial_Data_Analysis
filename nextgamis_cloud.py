@@ -3151,28 +3151,27 @@ class FinancialReport:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# run_cell — entry point for the generalised [dfb] BBcode on tssfl.com
+# make_report — entry point for the generalised [dfb] BBcode on tssfl.com
 #
-# The forum cell is only ever two lines:
+# The BBcode supplies a fixed, generic report menu that the reader can edit in
+# the SageCell editor before pressing Compute, so every customer keeps the full
+# flexibility of uncommenting whichever endpoints they want. Only two things
+# vary per customer, and they come from the post:
 #
-#     load(".../nextgamis_cloud.py")
-#     run_cell("customer|fileid|rlkey")
+#     report, CO = make_report("customer|fileid|rlkey")
 #
-# The post supplies bare pipe-separated tokens rather than a URL, because phpBB
-# HTML-escapes the BBcode's {TEXT} and the browser does not decode entities
-# inside <script>: a pasted Dropbox link would arrive carrying "&amp;" and fail.
-# The "&" is therefore assembled here, in Python, never in the post.
+# Bare pipe-separated tokens rather than a URL, because phpBB HTML-escapes the
+# BBcode's {TEXT} and the browser does not decode entities inside <script>: a
+# pasted link would arrive carrying "&amp;" and fail. The "&" is assembled here.
+# (The menu itself lives in the BBcode template, which is NOT escaped, so its
+# quotes survive intact.)
 #
-# Deliberately Dropbox-only -- but note why. The service account belongs to the
-# CUSTOMER and reads the CUSTOMER's own Google Drive, so this is not a
-# cross-tenant risk: a customer could only ever expose their own key to their
-# own private forum. It is excluded from the forum path purely because a
-# SageCell cell cannot hold a secret -- the key URL is visible to every reader
-# of the post and is also sent to sagecell.sagemath.org, a third party.
-# A per-file Dropbox link is a far smaller thing to expose than Drive API
-# credentials. The google_drive branch is kept intact and fully working for
-# local, desktop and run_analysis.py use, where the key file is handled
-# properly; setting it up per customer is laborious and worth preserving.
+# Dropbox-only by design. Not a tenancy matter -- the Google service account
+# belongs to the customer and reads their own Drive -- but a SageCell cell
+# cannot hold a secret at all: whatever it needs is visible to every reader of
+# the post and is sent to sagecell.sagemath.org. Drive API credentials are a
+# larger thing to expose that way than a per-file link. The google_drive branch
+# is untouched and still works for local, desktop and run_analysis.py use.
 # ─────────────────────────────────────────────────────────────────────────────
 
 CONFIG_BASE = ("https://raw.githubusercontent.com/TSSFL/"
@@ -3181,49 +3180,50 @@ CONFIG_BASE = ("https://raw.githubusercontent.com/TSSFL/"
 DROPBOX_URL = "https://www.dropbox.com/scl/fi/%s/data.csv?rlkey=%s&dl=1"
 
 
-def run_cell(spec, file_name="data.csv"):
-    """Render one customer's report set from a forum cell.
+def make_report(spec, file_name="data.csv"):
+    """Build a FinancialReport for one customer from a forum cell.
 
-    spec: "customer|fileid|rlkey" — customer selects configs/<customer>.py in
-    the public repo, which must define run_reports(report). fileid and rlkey
-    are the two opaque parts of that customer's Dropbox share link.
+    spec: "customer|fileid|rlkey". Returns (report, company_name) so the cell
+    can go straight on to report.abs_report(...) etc.
+
+    customer selects configs/<customer>.py in the public repo, which sets CO.
+    fileid and rlkey are the two opaque parts of that customer's Dropbox link.
     """
     parts = [p.strip() for p in str(spec).split("|")]
     if len(parts) < 3 or not all(parts[:3]):
         raise ValueError(
-            "run_cell expects 'customer|fileid|rlkey'; got %r. "
+            "make_report expects 'customer|fileid|rlkey'; got %r. "
             "Check the [dfb] tag in the post." % (spec,))
 
     customer, fileid, rlkey = parts[0], parts[1], parts[2]
 
-    # Fail loudly on anything that is not an opaque token. This keeps a stray
-    # quote, angle bracket or '&' out of the URL we are about to build, and
-    # stops one customer's tag reaching another path.
+    # Opaque tokens only: keeps a stray quote, bracket or '&' out of the URL we
+    # are about to build, and stops one customer's tag reaching another path.
     for name, value in (("customer", customer), ("fileid", fileid), ("rlkey", rlkey)):
         if not re.match(r'^[A-Za-z0-9_-]+$', value):
             raise ValueError(
-                "run_cell: %s must be letters, digits, '_' or '-'; got %r" % (name, value))
+                "make_report: %s must be letters, digits, '_' or '-'; got %r"
+                % (name, value))
 
-    load(CONFIG_BASE % customer)          # defines CO and run_reports(report)
+    load(CONFIG_BASE % customer)          # sets CO
 
-    # Sage's load() puts names in the *global* namespace, not this function's
-    # locals, so resolve explicitly rather than relying on scope lookup -- and
-    # say plainly what is wrong if the customer's config is missing or stale.
-    fn = globals().get("run_reports")
-    if not callable(fn):
+    # Sage's load() binds into the global namespace, not this function's
+    # locals, so resolve explicitly and say plainly what is missing.
+    company = globals().get("CO")
+    if not company:
         raise RuntimeError(
-            "configs/%s.py did not define run_reports(report). "
-            "Check the file exists in the public repo and defines that function."
-            % customer)
+            "configs/%s.py did not set CO. Check the file exists in the public "
+            "repo and defines CO = '<Company Name>'." % customer)
 
     report = FinancialReport(
         data_source="dropbox",
         file_path=DROPBOX_URL % (fileid, rlkey),
         file_name=file_name,
     )
+    return report, company
 
-    try:
-        fn(report)
-    finally:
-        if os.path.exists(file_name):
-            os.remove(file_name)
+
+def cleanup(file_name="data.csv"):
+    """Remove the downloaded data file. Safe to call when it is already gone."""
+    if os.path.exists(file_name):
+        os.remove(file_name)

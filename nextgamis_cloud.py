@@ -3176,7 +3176,7 @@ class FinancialReport:
 # ─────────────────────────────────────────────────────────────────────────────
 
 CONFIG_BASE = ("https://raw.githubusercontent.com/TSSFL/"
-               "DFB_Financial_Data_Analysis/master/configs/%s.py")
+               "DFB_Financial_Data_Analysis/refs/heads/master/configs/%s.py")
 
 DROPBOX_URL = "https://www.dropbox.com/scl/fi/%s/data.csv?rlkey=%s&dl=1"
 

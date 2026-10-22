@@ -3148,3 +3148,82 @@ class FinancialReport:
                 meta=self._size_time(stem + '.html', _t0))
         return stem + '.html'
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# run_cell — entry point for the generalised [dfb] BBcode on tssfl.com
+#
+# The forum cell is only ever two lines:
+#
+#     load(".../nextgamis_cloud.py")
+#     run_cell("customer|fileid|rlkey")
+#
+# The post supplies bare pipe-separated tokens rather than a URL, because phpBB
+# HTML-escapes the BBcode's {TEXT} and the browser does not decode entities
+# inside <script>: a pasted Dropbox link would arrive carrying "&amp;" and fail.
+# The "&" is therefore assembled here, in Python, never in the post.
+#
+# Deliberately Dropbox-only -- but note why. The service account belongs to the
+# CUSTOMER and reads the CUSTOMER's own Google Drive, so this is not a
+# cross-tenant risk: a customer could only ever expose their own key to their
+# own private forum. It is excluded from the forum path purely because a
+# SageCell cell cannot hold a secret -- the key URL is visible to every reader
+# of the post and is also sent to sagecell.sagemath.org, a third party.
+# A per-file Dropbox link is a far smaller thing to expose than Drive API
+# credentials. The google_drive branch is kept intact and fully working for
+# local, desktop and run_analysis.py use, where the key file is handled
+# properly; setting it up per customer is laborious and worth preserving.
+# ─────────────────────────────────────────────────────────────────────────────
+
+CONFIG_BASE = ("https://raw.githubusercontent.com/TSSFL/"
+               "DFB_Financial_Data_Analysis/master/configs/%s.py")
+
+DROPBOX_URL = "https://www.dropbox.com/scl/fi/%s/data.csv?rlkey=%s&dl=1"
+
+
+def run_cell(spec, file_name="data.csv"):
+    """Render one customer's report set from a forum cell.
+
+    spec: "customer|fileid|rlkey" — customer selects configs/<customer>.py in
+    the public repo, which must define run_reports(report). fileid and rlkey
+    are the two opaque parts of that customer's Dropbox share link.
+    """
+    parts = [p.strip() for p in str(spec).split("|")]
+    if len(parts) < 3 or not all(parts[:3]):
+        raise ValueError(
+            "run_cell expects 'customer|fileid|rlkey'; got %r. "
+            "Check the [dfb] tag in the post." % (spec,))
+
+    customer, fileid, rlkey = parts[0], parts[1], parts[2]
+
+    # Fail loudly on anything that is not an opaque token. This keeps a stray
+    # quote, angle bracket or '&' out of the URL we are about to build, and
+    # stops one customer's tag reaching another path.
+    for name, value in (("customer", customer), ("fileid", fileid), ("rlkey", rlkey)):
+        if not re.match(r'^[A-Za-z0-9_-]+$', value):
+            raise ValueError(
+                "run_cell: %s must be letters, digits, '_' or '-'; got %r" % (name, value))
+
+    load(CONFIG_BASE % customer)          # defines CO and run_reports(report)
+
+    # Sage's load() puts names in the *global* namespace, not this function's
+    # locals, so resolve explicitly rather than relying on scope lookup -- and
+    # say plainly what is wrong if the customer's config is missing or stale.
+    fn = globals().get("run_reports")
+    if not callable(fn):
+        raise RuntimeError(
+            "configs/%s.py did not define run_reports(report). "
+            "Check the file exists in the public repo and defines that function."
+            % customer)
+
+    report = FinancialReport(
+        data_source="dropbox",
+        file_path=DROPBOX_URL % (fileid, rlkey),
+        file_name=file_name,
+    )
+
+    try:
+        fn(report)
+    finally:
+        if os.path.exists(file_name):
+            os.remove(file_name)

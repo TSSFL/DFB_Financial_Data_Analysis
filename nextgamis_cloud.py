@@ -1800,9 +1800,11 @@ class FinancialReport:
 
     @classmethod
     def abs_has_superagent(cls, provider):
-        """Whether a provider's accounts can carry a super-agent tier: mobile money
-        and banks can; SELCOM, LIPA (merchant) numbers and agencies cannot."""
-        return provider in cls.MOBILE_POOL + cls.BANK_POOL and 'LIPA' not in provider
+        """Whether a provider's accounts can carry a super-agent tier: SELCOM,
+        mobile money and banks can (the reports already split SELCOM into normal
+        and super-agent, under SELCOM GRAND TOTAL); LIPA (merchant) numbers and
+        agencies cannot."""
+        return provider in [cls.SELCOM] + cls.MOBILE_POOL + cls.BANK_POOL and 'LIPA' not in provider
 
     @classmethod
     def abs_provider_groups(cls):

@@ -79,6 +79,7 @@ class FinancialReport:
         source = self.df if self.data_source == 'kobo' else getattr(self, 'data', None)
         if source is not None:
             self._normalise_source_dates(source)
+            self._normalise_source_numbers(source)
 
         #Untouched source frame, used by the NEXTGAMIS ABS parity reports
         self.raw_df = source.copy()
@@ -157,6 +158,36 @@ class FinancialReport:
             stripped = text.str.replace(cls._JS_DATE_TAIL, '', regex=True).str.strip()
             parsed = pd.to_datetime(stripped, format=cls._JS_DATE_FMT, errors='coerce')
             df[col] = parsed.dt.strftime(out_fmt).fillna(text)
+        return df
+
+    #A number the way a spreadsheet shows it: thousands grouped by commas, with an
+    #optional sign and decimals - '1,234,567.00', '-12,500'. Google Sheets hands
+    #numbers over like this in both its CSV export and its API.
+    _GROUPED_NUMBER = r'^\s*[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?\s*$'
+
+    @classmethod
+    def _normalise_source_numbers(cls, df):
+        """Take the thousands separators out of numbers written as a sheet shows them.
+
+        Called once from __init__ for every data source, next to the dates. Every
+        numeric step coerces with to_numeric(errors='coerce').fillna(0), which
+        reads '1,234,567.00' as NaN and so as 0: a Google Sheet came out with
+        every float, commission and amount of a thousand or more as zero, while
+        the same figures from a plain CSV were right - silent, decided only by
+        where the data came from.
+
+        Only a cell that is wholly such a number changes, so dates, names and
+        plain numbers pass through, and the free-text fields (ABS_TEXT_FIELDS,
+        any '... Details') are never touched. Safe to run twice.
+        """
+        for col in df.columns:
+            #text columns are 'object' on pandas 2 and 'str' on pandas 3: skip only true numbers
+            if pd.api.types.is_numeric_dtype(df[col]) or col in cls.ABS_TEXT_FIELDS or str(col).endswith(' Details'):
+                continue
+            text = df[col].astype(str)
+            hit = text.str.match(cls._GROUPED_NUMBER, na=False)
+            if hit.any():
+                df.loc[hit, col] = text[hit].str.replace(',', '', regex=False).str.strip()
         return df
 
     def _get_data_from_google_drive(self):

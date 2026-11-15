@@ -32,6 +32,7 @@ import regex as re
 from datetime import date, datetime, timezone, timedelta
 
 import os
+import json
 import time
 import warnings
 warnings.filterwarnings('ignore')
@@ -1719,12 +1720,31 @@ class FinancialReport:
     #old wording, so they are mapped onto the current provider name at read time.
     PROVIDER_ALIASES = {'AKIBA BANK': 'ACB BANK'}
 
-    #Fields that are never provider accounts.
-    ABS_NON_PROVIDER = {
-        'Timestamp', 'Name of Submitter', 'Date of Transaction', 'Date of Submission',
-        'MOBILE BUNDLES COMM and SHARES', 'CAPITAL INFUSION', 'SALARIES', 'EXPENDITURES',
-        'TRANSFER FEES', 'HARD CASH', 'CREDIT', 'CREDIT PAID', 'DEBIT', 'DEBIT PAID',
-        'INCIDENTS', 'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW', 'DAY NAME',
+    #A day's entry: everything an entry sheet or form asks for besides the provider
+    #accounts. Entry sheets, forms and their templates are built from these lists
+    #(abs_entry_columns), so a field added or removed here reaches every new sheet.
+    #When the entry was made, by whom, and for which day:
+    ABS_ENTRY_HEAD = ['Timestamp', 'Name of Submitter', 'Date of Transaction']
+    #The day's amounts that belong to no provider account:
+    ABS_ENTRY_AMOUNTS = ['MOBILE BUNDLES COMM and SHARES', 'TRANSFER FEES', 'SALARIES',
+                         'EXPENDITURES', 'CAPITAL INFUSION', 'HARD CASH',
+                         'CREDIT', 'CREDIT PAID', 'DEBIT', 'DEBIT PAID']
+
+    #MERCHANT NUMBERS Earnings Details: earnings on merchant (LIPA) numbers,
+    #mobile and bank alike, as one free-text entry - first of the Details. The
+    #name contains none of the words the totals select columns by.
+    ABS_TEXT_FIELDS = ['MERCHANT NUMBERS Earnings Details',
+                       'MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
+                       'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details',
+                       'CREDIT Details', 'CREDIT PAID Details',
+                       'DEBIT Details', 'DEBIT PAID Details',
+                       'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
+
+    #Fields that are never provider accounts: the entry's own fields, and the
+    #columns the reports add.
+    ABS_NON_PROVIDER = set(ABS_ENTRY_HEAD) | set(ABS_ENTRY_AMOUNTS) | {
+        'Date of Submission', 'INCIDENTS',
+        'TOTAL CASH INFLOW', 'TOTAL CASH OUTFLOW', 'DAY NAME',
         'ACTUAL OPERATING CAPITAL', 'EXPECTED OPERATING CAPITAL',
         'EXCESS', 'LOSS', 'EXCESS/LOSS', 'S/N',
         #Only feeds the Kobo name index: a Kobo field merchant_numbers_earnings_details
@@ -1737,16 +1757,6 @@ class FinancialReport:
     #enough to crowd out the data on a phone.
     ABS_SUMMARY_LABELS = ('TOTALS', 'AVERAGE', 'MAXIMUM', 'MINIMUM')
 
-    #MERCHANT NUMBERS Earnings Details: earnings on merchant (LIPA) numbers,
-    #mobile and bank alike, as one free-text entry - first of the Details. The
-    #name contains none of the words the totals select columns by.
-    ABS_TEXT_FIELDS = ['MERCHANT NUMBERS Earnings Details',
-                       'MOBILE BUNDLES and SHARES Details', 'CAPITAL INFUSION Details',
-                       'TRANSFER FEES Details', 'SALARIES Details', 'EXPENDITURES Details',
-                       'CREDIT Details', 'CREDIT PAID Details',
-                       'DEBIT Details', 'DEBIT PAID Details',
-                       'Transaction Anomalies and Irregularities Details', 'INCIDENTS']
-
     # ── Column naming ─────────────────────────────────────────────────────────
 
     @classmethod
@@ -1754,6 +1764,65 @@ class FinancialReport:
         if col in cls.ABS_NON_PROVIDER or col.endswith(' Details') or col.startswith('TOTAL '):
             return True
         return ' TOTAL' in col or 'GRAND TOTAL' in col
+
+    # ── Entry sheets ──────────────────────────────────────────────────────────
+
+    @classmethod
+    def abs_has_superagent(cls, provider):
+        """Whether a provider's accounts can carry a super-agent tier: mobile money
+        and banks can; SELCOM, LIPA (merchant) numbers and agencies cannot."""
+        return provider in cls.MOBILE_POOL + cls.BANK_POOL and 'LIPA' not in provider
+
+    @classmethod
+    def abs_provider_groups(cls):
+        """The providers an entry sheet can carry, in groups and in this order:
+        [{'name': ..., 'providers': [...], 'superagent': [...]}, ...] where
+        'superagent' lists the providers in that group with a super-agent tier."""
+        groups = [('SELCOM', [cls.SELCOM]), ('Mobile money and LIPA numbers', cls.MOBILE_POOL),
+                  ('Banks', cls.BANK_POOL), ('Money transfer agencies', cls.AGENCY_POOL)]
+        return [{'name': name, 'providers': list(pool),
+                 'superagent': [p for p in pool if cls.abs_has_superagent(p)]}
+                for name, pool in groups]
+
+    @classmethod
+    def abs_entry_columns(cls, accounts):
+        """The header row of an entry sheet or form, in ABS naming.
+
+        accounts: [{'name': 'CRDB BANK', 'accounts': 2, 'superagent': True}, ...],
+        or the same as a JSON string (for callers outside Python). Each account
+        gets its float column and its commission column - 'CRDB BANK 1' and
+        'CRDB BANK 1 COMM' - and its super-agent pair where asked for and the
+        provider has one. The row is ABS_ENTRY_HEAD, the floats, the commissions,
+        ABS_ENTRY_AMOUNTS and ABS_TEXT_FIELDS.
+        """
+        if isinstance(accounts, str):
+            accounts = json.loads(accounts)
+        known = set([cls.SELCOM] + cls.MOBILE_POOL + cls.BANK_POOL + cls.AGENCY_POOL)
+        floats, comms = [], []
+        for a in accounts:
+            name = cls.PROVIDER_ALIASES.get(a['name'], a['name'])
+            if name not in known:
+                raise ValueError("'{}' is not a provider this engine knows".format(a['name']))
+            sup = bool(a.get('superagent')) and cls.abs_has_superagent(name)
+            for i in range(1, max(1, int(a.get('accounts', 1))) + 1):
+                floats.append("{} {}".format(name, i))
+                comms.append("{} {} COMM".format(name, i))
+                if sup:
+                    floats.append("{} SUPERAGENT {}".format(name, i))
+                    comms.append("{} SUPERAGENT {} COMM".format(name, i))
+        return cls.ABS_ENTRY_HEAD + floats + comms + cls.ABS_ENTRY_AMOUNTS + cls.ABS_TEXT_FIELDS
+
+    @classmethod
+    def abs_provider_columns(cls, columns):
+        """The columns, of those given, that are accounts of a provider this
+        engine knows - in any naming it reads, legacy Cloud names included."""
+        known = set([cls.SELCOM] + cls.MOBILE_POOL + cls.BANK_POOL + cls.AGENCY_POOL)
+        out = []
+        for c in columns:
+            n = cls.normalise_column(c)
+            if not cls._abs_is_non_provider(n) and re.sub(r'( SUPERAGENT)? \d+( COMM)?$', '', n) in known:
+                out.append(c)
+        return out
 
     @classmethod
     def normalise_column(cls, col):

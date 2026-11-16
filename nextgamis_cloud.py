@@ -1783,6 +1783,12 @@ class FinancialReport:
         'MERCHANT NUMBERS Earnings Details',
     }
 
+    #A report made with no company name is an anonymised report, as in NEXTGAMIS ABS:
+    #its header names no business and its file name says so, so a report passed on
+    #without a name can never be mistaken for one that carries it.
+    ABS_ANONYMOUS_COMPANY = 'Anonymized Agency'
+    ABS_ANONYMOUS_SLUG = 'ANONYMIZED'
+
     #Short labels: the summary block sits in the sticky first column, so its
     #width is set by the longest label. "COLUMN TOTALS" forced that column wide
     #enough to crowd out the data on a phone.
@@ -2715,7 +2721,7 @@ class FinancialReport:
         df_html = self._html_table(fdf)
 
         css, band = self._abs_css()
-        comp = (company_name or 'NEXTGAMIS CLOUD').upper()
+        comp = ((company_name or '').strip() or self.ABS_ANONYMOUS_COMPANY).upper()
         stamp = self._now().strftime('%d/%m/%Y at %H:%M:%S')
         head = ("{} {}<span class='ngc-sub'>Generated for "
                 "<span class='ngc-co'>{}</span> on {}</span>").format(title, period_desc, comp, stamp)
@@ -2967,7 +2973,7 @@ class FinancialReport:
         has four, and 'From ... to ...' has sixteen.
         """
         now = self._now()
-        slug = re.sub(r'[^A-Za-z0-9]+', '_', (company_name or 'NEXTGAMIS')).strip('_')[:25]
+        slug = re.sub(r'[^A-Za-z0-9]+', '_', ((company_name or '').strip() or self.ABS_ANONYMOUS_SLUG)).strip('_')[:25]
         scope = desc.replace(' ', '_')
         digits = re.sub(r'\D', '', scope)
         if len(digits) == 8:
@@ -3140,7 +3146,7 @@ class FinancialReport:
                         "{}<td class='det'>{}</td></tr>".format(kind, i, col,
                                                                 amt_cell(val, kind, col), safe))
 
-        comp = (company_name or 'NEXTGAMIS CLOUD').upper()
+        comp = ((company_name or '').strip() or self.ABS_ANONYMOUS_COMPANY).upper()
         stamp = self._now().strftime('%d/%m/%Y at %H:%M:%S')
         band = self._band_html()   #six cells; .qr-band below lays them out
         css = """

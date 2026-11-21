@@ -715,7 +715,33 @@ class FinancialReport:
                 expenditures = submitter_df['EXPENDITURES'].iloc[i]
                 credit = submitter_df['CREDIT'].iloc[i]
                 credit_paid = submitter_df['CREDIT PAID'].iloc[i]
-                
+
+                # ⚠️ DEBIT and DEBIT PAID are deliberately absent here.
+                # They are not missing from the legacy reconciliation -- they
+                # are applied one step earlier, in update_operating_capital(),
+                # which adjusts ACTUAL by +cumsum(DEBIT) -cumsum(DEBIT PAID):
+                # money lent out is still the shop's capital, it is simply not
+                # on the counter. That is algebraically the same answer the ABS
+                # parity layer reaches by putting the pair in its flows and
+                # leaving ACTUAL raw --
+                #
+                #   legacy:  EL = (dACTUAL_raw + D - DP) - flows
+                #   parity:  EL =  dACTUAL_raw - flows - DP + D
+                #
+                # -- so naming them here as well DOUBLE-COUNTS them. Proposed
+                # on 2026-11-21 on the reading that the legacy family had never
+                # heard of DEBIT, and withdrawn the same hour when measurement
+                # said otherwise: against the real customer file the untouched
+                # legacy EXCESS/LOSS already agreed with the parity layer on
+                # every debit date (-0.01 and -8,431,151 to the cent), and the
+                # "fix" moved them to +219,999.99 and -8,801,151 -- exactly the
+                # DEBIT amounts, in the wrong direction. Max divergence from
+                # the parity layer went from 10,300.99 to 370,000.
+                #
+                # The rule looked absent because it was looked for in the
+                # obvious function. Grepping an expression is not searching a
+                # model.
+
                 expected = prev_actual + commission + infusion + credit - fees - salaries - expenditures - credit_paid
 
                 submitter_df.loc[submitter_df.index[i], 'EXPECTED OPERATING CAPITAL'] = expected #Use .loc with boolean indexing
@@ -1249,6 +1275,9 @@ class FinancialReport:
              self.df = self.consolidate_transactions(self.df) #Consolidate multiple rows for the same date
              #Expected here means the capital that you should have after some changes compared to the previous one
              #EXPECTED OPERATING CAPITAL
+                 # DEBIT and DEBIT PAID are applied to ACTUAL by
+             # update_operating_capital(), not to EXPECTED here -- see the note
+             # in calculate_expected_capital(). Adding them would double-count.
              self.df.insert(self.df.columns.get_loc('ACTUAL OPERATING CAPITAL') + 1, 'EXPECTED OPERATING CAPITAL', self.df.loc[1:, ['TOTAL COMMISSION', 'CAPITAL INFUSION', 'CREDIT']].sum(numeric_only=True, axis=1) - self.df.loc[1:, ['TRANSFER FEES', 'SALARIES', 'EXPENDITURES', 'CREDIT PAID']].sum(numeric_only=True, axis=1) + self.df['ACTUAL OPERATING CAPITAL'].shift(1))
              self.df.at[0, 'EXPECTED OPERATING CAPITAL'] = self.df.at[0, 'ACTUAL OPERATING CAPITAL']
 
@@ -2246,8 +2275,20 @@ class FinancialReport:
             df.loc[rows, 'EXCESS'] = np.where(el > 0, el, 0.0)
             df.loc[rows, 'LOSS'] = np.where(el < 0, np.abs(el), 0.0)
 
-        df['TOTAL CASH INFLOW']  = df['TOTAL COMMISSION'] + df['CAPITAL INFUSION'] + df['EXCESS']
-        df['TOTAL CASH OUTFLOW'] = df['TRANSFER FEES'] + df['SALARIES'] + df['EXPENDITURES']
+        #⚠️ These two said something different from the reconciliation
+        #directly above them (2026-11-21). flow_in and flow_out have always
+        #counted CREDIT and DEBIT PAID as money in and CREDIT PAID and DEBIT as
+        #money out -- EXPECTED OPERATING CAPITAL is chained on them, so the
+        #shop's balance has always been right -- while the two columns the
+        #operator reads named neither pair. A day that collected a 500,000 debt
+        #and paid out 200,000 of credit showed an inflow that did not mention
+        #the 500,000, beside an EXPECTED figure computed from it. One rule
+        #written twice, and only one copy ever edited. Mirrored in ABS
+        #src/engine.py the same day.
+        df['TOTAL CASH INFLOW']  = (df['TOTAL COMMISSION'] + df['CAPITAL INFUSION']
+                                    + df['CREDIT'] + df['DEBIT PAID'] + df['EXCESS'])
+        df['TOTAL CASH OUTFLOW'] = (df['TRANSFER FEES'] + df['SALARIES']
+                                    + df['EXPENDITURES'] + df['CREDIT PAID'] + df['DEBIT'])
         df.drop(columns=['_dp'], inplace=True)
         return df.copy()
 
@@ -2357,8 +2398,12 @@ class FinancialReport:
         mins = active.min().fillna(0.0)
         mins = mins.where(maxs.abs() > _ZERO_TOL, 0.0)
 
+        #PROFIT is a flow: a month's profit adds to the next month's, so COLUMN
+        #TOTALS over the commission report is the period's profit. The allowlist
+        #is opt-in, so without it the column would print blank at the foot of the
+        #one report it exists for.
         allow_sum = ['COMM', 'SALARIES', 'EXPENDITURES', 'INFUSION', 'FEES', 'TOTAL CASH',
-                     'EXCESS', 'LOSS', 'CREDIT', 'DEBIT', 'SHARES']
+                     'EXCESS', 'LOSS', 'CREDIT', 'DEBIT', 'SHARES', 'PROFIT']
         for col in numeric_cols:
             is_flow = any(kw in col for kw in allow_sum)
             #HARD CASH is a balance, not a flow. Cash and float are two forms of
@@ -2705,7 +2750,7 @@ class FinancialReport:
         for i, col in enumerate(fdf.columns, start=1):
             if 'Details' in col or 'INCIDENTS' in col:
                 detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
-                               "{min-width:400px !important;max-width:650px !important;"
+                               "{min-width:400px !important;max-width:1300px !important;"
                                "white-space:normal !important;word-wrap:break-word !important;"
                                "text-align:left !important;line-height:1.35 !important;}\n" % (i, i))
             elif 'Name of Submitter' in col:
@@ -2841,10 +2886,36 @@ class FinancialReport:
                      'TOTAL AGENCY COMMISSION', 'TOTAL MOBILE COMMISSION',
                      'TOTAL BANK COMMISSION']
             agg = [c for c in dict.fromkeys(comm_cols + prov_totals + grand) if c in fdf.columns]
-            res = fdf.groupby('Month Period')[agg + ['TOTAL COMMISSION']].sum().reset_index()
+            #PROFIT is what the month earned after what the month cost:
+            #
+            #    PROFIT = TOTAL COMMISSION - EXPENDITURES - SALARIES
+            #                              - TRANSFER FEES - LOSS
+            #
+            #The four deductions are carried in the report beside it rather than
+            #only consumed, so the figure can be checked against the report it is
+            #printed in -- the rule the Mini Totals dashboard and the commission
+            #breakdown are both held to (2026-09-30, 2026-10-06): a total whose
+            #parts are not shown is a number nobody can verify.
+            #
+            #⚠️ LOSS is already stored as a positive magnitude
+            #(abs_run_calculations writes np.abs(el)), so it is subtracted, not
+            #added. It is also written onto the LAST row of each date group only,
+            #which is what makes a plain monthly sum correct: the other rows of a
+            #multi-submission date hold zero by construction.
+            #
+            #⚠️ EXCESS is deliberately NOT added back. A shortfall
+            #reduces the month's profit and a surplus does not raise it --
+            #unexplained money on the counter is not earnings, and treating it as
+            #such would turn a reconciliation fault into income.
+            deductions = [c for c in ('EXPENDITURES', 'SALARIES', 'TRANSFER FEES', 'LOSS')
+                          if c in fdf.columns]
+            res = fdf.groupby('Month Period')[
+                agg + ['TOTAL COMMISSION'] + deductions].sum().reset_index()
             res = res.sort_values('Month Period').reset_index(drop=True)
             res['Date of Transaction'] = res['Month Period'].dt.strftime('%B %Y')
             res = res.drop(columns=['Month Period'])
+            res['PROFIT'] = res['TOTAL COMMISSION'] - sum(
+                (res[c] for c in deductions), start=0.0)
             res = res[['Date of Transaction'] + [c for c in res.columns
                                                  if c != 'Date of Transaction']]
             res['S/N'] = range(1, len(res) + 1)

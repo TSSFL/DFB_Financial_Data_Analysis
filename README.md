@@ -137,7 +137,7 @@ Reports 1–5 accept any of three periods. Reports 6 and 7 cover a single date.
 |---|--------|------|
 | 1 | Comprehensive — every column, full reconciliation | `abs_report(1)` |
 | 2 | Clean Full — comprehensive with the per-provider subtotals dropped, group totals kept | `abs_report(2)` |
-| 3 | Monthly Commission — commission summed by calendar month, earliest first | `abs_report(3)` |
+| 3 | Monthly Commission — commission summed by calendar month, earliest first, with `PROFIT` | `abs_report(3)` |
 | 4 | Mini Totals Dashboard — float, hard cash, and the operating-capital position | `abs_report(4)` |
 | 5 | Compact Accounts — every account column, no totals | `abs_report(5)` |
 | 6 | Daily Snapshot — every submission for one date, plus the COMBINED row | `daily_snapshot_report(date=…)` |
@@ -168,10 +168,48 @@ to HTML if WeasyPrint is unavailable.
 Every report takes an optional `company_name=` — it heads the document and prefixes
 the filename — and an optional `output_file=` to override the generated name.
 
+**Profit, in report 3.** Each month carries
+
+```
+PROFIT = TOTAL COMMISSION - EXPENDITURES - SALARIES - TRANSFER FEES - LOSS
+```
+
+and the four deductions are printed beside it, so the figure can be checked
+against the report it appears in rather than taken on trust. `LOSS` is stored as
+a positive magnitude and is therefore subtracted. `EXCESS` is **not** added
+back: a shortfall reduces the month's profit and a surplus does not raise it,
+because unexplained money on the counter is not earnings. Note that one badly
+reconciled day dominates its month, which is a property of the figure and not a
+fault in it.
+
+**Money in and money out.** `TOTAL CASH INFLOW` is `TOTAL COMMISSION + CAPITAL
+INFUSION + CREDIT + DEBIT PAID + EXCESS`; `TOTAL CASH OUTFLOW` is `TRANSFER
+FEES + SALARIES + EXPENDITURES + CREDIT PAID + DEBIT`. The credit and debit
+terms were added on 2026-11-21: the reconciliation behind `EXPECTED OPERATING
+CAPITAL` had always counted them and these two columns had not, so on any day
+carrying a debt collected or credit paid out the report disagreed with itself.
+
 ### Legacy reports
 
 The original reporting methods are carried unchanged. `report_type` is `'full'` or
 `'brief'`.
+
+⚠️ **They reconcile `DEBIT` and `DEBIT PAID` in a different place, and it is
+not a fault.** `calculate_expected_capital()` names `CREDIT` and `CREDIT PAID`
+only, which reads as an omission. It is not: `update_operating_capital()`
+applies the debit pair one step earlier, adjusting **ACTUAL** by
+`+cumsum(DEBIT) − cumsum(DEBIT PAID)` — money lent out is still the shop's
+capital, it is simply not on the counter. The parity layer reaches the same
+answer the other way, by putting the pair in its flows and leaving ACTUAL raw:
+
+```
+legacy:  EXCESS/LOSS = (ΔACTUAL_adjusted + DEBIT − DEBIT PAID) − flows
+parity:  EXCESS/LOSS =  ΔACTUAL_raw − flows − DEBIT PAID + DEBIT
+```
+
+Checked against a real customer file: on every date carrying a debt the two
+agree to the cent. **Do not add the pair to the legacy expected-capital
+expression** — it would double-count them.
 
 ```python
 report.comm_report()

@@ -37,6 +37,124 @@ import time
 import warnings
 warnings.filterwarnings('ignore')
 
+# --- Width of a free-text (Details / INCIDENTS) column -----------------------
+#
+#A Details column is made wide enough to hold its own longest entry **on one
+#line**, up to twice the 400px floor every such column has always had. Only
+#once an entry needs more than that does it wrap -- which is what "expand up
+#to twice as now so that they do not increase vertical height" asks for.
+_TAG_RE = re.compile(r"<[^>]*>")
+_DETAIL_BASE_PX = 400          #the floor, unchanged since the beginning
+_DETAIL_MAX_PX  = 800          #twice it: the cap, past which text wraps
+_DETAIL_PAD_PX  = 28           #the cell's own left + right padding
+_DETAIL_STEP_PX = 50           #widths are rounded up to a tidy step
+_DETAIL_FONT_PX = 17.28       #table.ngc renders a cell at 1.08rem = 17.28px
+
+#Advance widths of **Liberation Sans Bold**, read off the bundled
+#assets/fonts/LiberationSans-Bold.ttf with fontTools and baked in as a
+#literal. fontTools must never become a runtime dependency here: NEXTGAMIS CLOUD runs this same
+#code under Pyodide in a browser with no font file at all.
+#ABS's tests/test_detail_width.py re-reads the font and fails if it drifts.
+#
+#One table, deliberately the Bold one: the Cloud renders a Details cell at
+#weight 600, which maps to Bold, while ABS renders it at 400, where every
+#glyph is ~8% narrower. Estimating ABS with Bold therefore errs *generous*,
+#and generous means the entry still fits on one line -- the one direction of
+#error that costs nothing here, since the result is capped either way.
+_EM = 2048
+_ADVANCE_GROUPS = {
+     487: "'",
+     569: ' ,./I\\ijl',
+     573: '|',
+     682: '!()-:;[]`ft',
+     797: '*r{}',
+     971: '"',
+    1024: 'z',
+    1139: '#$0123456789J_aceksvxy',
+    1196: '+<=>^~',
+    1251: '?FLTZbdghnopqu',
+    1366: 'EPSVXY',
+    1479: '&ABCDHKNRU',
+    1593: 'GOQw',
+    1706: 'M',
+    1821: '%m',
+    1933: 'W',
+    1997: '@',
+}
+_ADVANCE_GROUPS_BY_CHAR = {c: u for u, chars in _ADVANCE_GROUPS.items() for c in chars}
+_ADVANCE_DEFAULT = 1129          #mean over printable ASCII, for anything else
+
+#Measuring is done by byte translation, not by summing a dict per character.
+#A year of data is ~600 rows x 12 free-text columns, and a per-character
+#lookup there is ~1M Python-level operations against a report that otherwise
+#generates in 0.2s. encode + translate + sum are three C loops instead.
+#Quantising to 8 font units costs at most 0.2% of an em per character --
+#~5px over a 150-character entry, against a 50px rounding step.
+_W_STEP = 8
+_WIDTH_BYTES = bytes(
+    round(_ADVANCE_GROUPS_BY_CHAR.get(chr(b), _ADVANCE_DEFAULT) / _W_STEP)
+    for b in range(256))
+_PX_PER_UNIT = _W_STEP / _EM
+_MAX_UNITS_PER_CHAR = max(_WIDTH_BYTES)
+
+
+def _text_px(text, font_px=_DETAIL_FONT_PX):
+    """Rendered width of `text` in pixels, from real font metrics.
+
+    Checked against Chrome's own measureText in the report's computed font: a
+    150-character live entry came to 1288px here against 1287px measured, and
+    per-character averages agreed to two decimals across prose, Swahili and
+    digits. Non-latin-1 characters become "?" and are costed as such.
+    """
+    return (sum(text.encode('latin-1', 'replace').translate(_WIDTH_BYTES))
+            * _PX_PER_UNIT * font_px)
+
+
+def _detail_floor_px(values, font_px=_DETAIL_FONT_PX):
+    """The min-width a free-text column needs to hold its longest entry on ONE
+    line, clamped to [_DETAIL_BASE_PX, _DETAIL_MAX_PX]. Past the cap it wraps.
+
+    The width is computed from the data because **min-width is the only
+    property that can widen one of these columns.** Measured in Chrome against
+    a live 102-column report (2026-11-21): `width: 700px` is ignored outright
+    (still 392px), `max-width: 200px` renders 229px -- a ceiling only ever
+    clamps *downwards* -- `max-width: 5000px` renders 392px, and
+    `min-width: 800px` renders 829px. So the ceiling was raised that day and
+    **nothing changed**: the layout already wanted only ~392px, well under
+    either value. A ceiling cannot grant room the layout never asked for.
+
+    A character *count* will not do either. At 18px, prose measures 8.0px per
+    character, digits 10.0 and capitals 12.4, and real Details entries are
+    digit-heavy ("[2700000],kodi DFB,[45000]matumizi ya krismas"). An earlier
+    version assumed a flat 10px and aimed at two lines; both are gone.
+    """
+    widest = 0
+    cap = (_DETAIL_MAX_PX - _DETAIL_PAD_PX) / (_PX_PER_UNIT * font_px)
+    for v in values:
+        if not v:
+            continue
+        text = v if type(v) is str else str(v)
+        if '<' in text:
+            text = _TAG_RE.sub('', text)
+        #len() is O(1), so this rejects most cells without touching them:
+        #no string can be wider than its length times the widest glyph.
+        if len(text) * _MAX_UNITS_PER_CHAR <= widest:
+            continue
+        text = text.strip()
+        if not text or text in ('-', 'nan', 'NaN'):
+            continue
+        units = sum(text.encode('latin-1', 'replace').translate(_WIDTH_BYTES))
+        if units > widest:
+            widest = units
+            if widest >= cap:          #already past the cap; nothing can win
+                break
+    if not widest:
+        return _DETAIL_BASE_PX
+    want = widest * _PX_PER_UNIT * font_px + _DETAIL_PAD_PX
+    want = int(-(-want // _DETAIL_STEP_PX) * _DETAIL_STEP_PX)
+    return max(_DETAIL_BASE_PX, min(_DETAIL_MAX_PX, want))
+
+
 class FinancialReport:
     #Default KoboToolbox API root, used when url= is not given.
     KOBO_ENDPOINT = 'https://kf.kobotoolbox.org/api/v2'
@@ -2749,10 +2867,13 @@ class FinancialReport:
         detail_css = ''
         for i, col in enumerate(fdf.columns, start=1):
             if 'Details' in col or 'INCIDENTS' in col:
+                #Sized to this column's own longest entry - see _detail_floor_px:
+                #a ceiling cannot widen a table cell, only min-width can.
                 detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
-                               "{min-width:400px !important;max-width:1300px !important;"
+                               "{min-width:%dpx !important;"
                                "white-space:normal !important;word-wrap:break-word !important;"
-                               "text-align:left !important;line-height:1.35 !important;}\n" % (i, i))
+                               "text-align:left !important;line-height:1.35 !important;}\n"
+                               % (i, i, _detail_floor_px(fdf[col])))
             elif 'Name of Submitter' in col:
                 detail_css += (".dataframe td:nth-child(%d), .dataframe th:nth-child(%d)"
                                "{min-width:200px !important;max-width:320px !important;"

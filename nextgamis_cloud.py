@@ -14,6 +14,7 @@
 #naming with backward compatibility for the legacy form headers, ABS
 #reconciliation maths, and ABS typography.
 
+import builtins
 import urllib.request
 import numpy as np
 import pandas as pd
@@ -91,8 +92,11 @@ _ADVANCE_DEFAULT = 1129          #mean over printable ASCII, for anything else
 #Quantising to 8 font units costs at most 0.2% of an em per character --
 #~5px over a 150-character entry, against a 50px rounding step.
 _W_STEP = 8
+#builtins.round, not round: in SageMathCell's load() namespace round() is Sage's and
+#returns a Sage real, which bytes() refuses (TypeError at load, 23 Nov 2026). Python's
+#own round keeps the same integers here and in Pyodide.
 _WIDTH_BYTES = bytes(
-    round(_ADVANCE_GROUPS_BY_CHAR.get(chr(b), _ADVANCE_DEFAULT) / _W_STEP)
+    builtins.round(_ADVANCE_GROUPS_BY_CHAR.get(chr(b), _ADVANCE_DEFAULT) / _W_STEP)
     for b in range(256))
 _PX_PER_UNIT = _W_STEP / _EM
 _MAX_UNITS_PER_CHAR = max(_WIDTH_BYTES)

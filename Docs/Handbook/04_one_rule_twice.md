@@ -1,4 +1,4 @@
-# 04 — One rule, two engines
+# 04 — One rule, written twice
 
 Three products share rules, and each pair drifts in its own way.
 

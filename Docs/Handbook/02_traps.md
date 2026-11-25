@@ -19,7 +19,7 @@ money columns, wrong reports and wrong schemas.
 
 **What to do:** before editing a rule, `grep` the *other* engine and the *other*
 file for it. A fix in one engine is not finished until the other has been read.
-See [04 — One rule, two engines](04_one_rule_two_engines.md).
+See [04 — One rule, written twice](04_one_rule_twice.md).
 
 ⚠️ **Deliberate duplication is allowed, but must be guarded by a test.**
 `run_app.py` keeps its own copy of the failure matcher because its guard runs

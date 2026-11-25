@@ -36,7 +36,7 @@ for anything touching column lists. See [chapter 06](06_cloud_traps.md).
 | [01 — Where context lives](01_where_context_lives.md) | The four homes for a fact, and **what this repo is missing** | You have learned something and do not know where to put it |
 | [02 — The traps](02_traps.md) | Ecosystem-wide failure patterns, with evidence | Always. Read this one first |
 | [03 — Proving it works](03_proving_it_works.md) | What counts as evidence; controls; measuring instead of reasoning | You are about to say "verified", "fixed" or "confirmed" |
-| [04 — One rule, two engines](04_one_rule_two_engines.md) | Parity between ABS, CLOUD and ERP | You are editing anything that exists in more than one place |
+| [04 — One rule, written twice](04_one_rule_twice.md) | Parity between ABS, CLOUD and ERP | You are editing anything that exists in more than one place |
 | [05 — Shipping](05_shipping.md) | Builds, packaging, published links, things that cannot be recalled | You are about to produce or publish an artifact |
 | [06 — CLOUD's own traps](06_cloud_traps.md) | The deploy, Pyodide, the two worktrees, the legacy family | You are touching this engine at all |
 
@@ -70,6 +70,17 @@ learn **into this repository**.
 
 ## Keeping the copies in step
 
-Chapters 02–05 are ecosystem-wide and are **copied verbatim** from the canonical
-set. When one of them gains a trap, copy it to every repository that holds a
-Handbook — ABS, ERP and CLOUD. Chapters 01 and 06 are per-repository.
+Chapters 02, 03 and 05 are ecosystem-wide and are **copied verbatim** from the
+canonical set. When one of them gains a trap, copy it to every repository that
+holds a Handbook — ABS, ERP and CLOUD. Chapters 01, 04 and 06 are
+per-repository; ABS and CLOUD hold the same chapter 04 because they are the
+same pair of engines.
+
+⛔ **A link inside a copied chapter must name a file that exists under that
+name in every repository.** Chapter 04 was `04_one_rule_two_engines.md` in ABS
+and CLOUD and `04_one_rule_two_products.md` in ERP, so the link in chapter 02 —
+copied verbatim, as the rule requires — pointed at nothing in ERP for as long
+as the chapter existed. It is `04_one_rule_twice.md` everywhere now, titled the
+same, with the **content** still written for the repo it sits in: ABS and CLOUD
+share theirs because they are the same pair of engines, ERP's names ERP's own
+duplication. Rename a chapter and you break every other repo's copy, silently.

@@ -57,6 +57,7 @@ what it happens to *contain* today?
 | `ldd lib/*.so` without `LD_LIBRARY_PATH` pointing at the bundle | Resolves against the host. Cannot fail here, cannot succeed on a customer machine |
 | Four of five excepthook tests matching source strings | Commenting a guard out leaves `# sys.excepthook = …`, which still *contains* the substring. They passed against code with the guards removed |
 | An ERP test loading a module copy from a dead scratchpad path | `skipTest`-ed on every run, for months |
+| A mutation sweep printing `caught 27/27` | **Two of its 29 mutations were never applied** — each pattern occurs twice in its file, because the rule is written twice — and the denominator counted only the ones that ran. Lost coverage read as a clean sweep |
 
 **Always run the control first.** If the positive case does not light up, the
 negative case tells you nothing.

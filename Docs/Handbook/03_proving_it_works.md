@@ -102,6 +102,45 @@ function nested inside a neighbouring one at the same indentation, where every
 call site would have raised `NameError`. The parse tree said so
 (`[n.name for n in ast.parse(src).body]`); reading the diff did not.
 
+## ⚠️ A stub is a signature contract, and it breaks in the wrong file
+
+`log_action()` gained an optional `module=` keyword. Nine tests stubbed it as
+`lambda *a: None`, so the suite failed with
+
+```
+TypeError: log_action() got an unexpected keyword argument 'module'
+```
+
+raised **inside the module under test**, naming the production function and the
+production call site. Nothing in that message says the fault is a stale test
+double, so it reads as a bug in the code just written — and the first instinct
+is to revert a correct change. Stub with `**k` wherever you stand in for a
+function that may grow an optional argument.
+
+⚠️ **The same property is an asset when the double records what it was given.**
+One stub — `view_audit_log` in `test_otp_scope.py` — was the only one in 852
+tests that noticed the signature had changed at all. It was then strengthened
+from *"it was called"* to *"it was called with this scope"*, which turns a test
+double into an assertion about the caller.
+
+## ⛔ A tool that rewrites your tree must own it alone
+
+`scripts/mutation_sweep.py` proves the suite can fail by editing the source,
+running the tests and restoring the file. It was started in the background and
+then `logger.py`, `TECHNICAL_REFERENCE.md` and the sweep's own script were
+edited while it was mutating — the hazard its own docstring warns about.
+Killing it skips its `finally`, so each kill left one mutation standing in the
+working tree. Both were found and repaired, but a commit in between would have
+shipped deliberately broken code.
+
+⚠️ **And the repair check was itself unsound.** A scan for mutated regions
+reported three, because a mutated `_LOG_RE` is a **substring** of the correct
+one. Reading the actual lines showed one. Same family as
+[trap 3](02_traps.md) — the check could not fail.
+
+> Run it on a clean tree, run nothing else beside it, and read the lines
+> afterwards rather than searching for them.
+
 ## Report faithfully
 
 - If tests fail, say so and show the output.

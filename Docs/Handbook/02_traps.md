@@ -1,7 +1,7 @@
 # 02 — The traps
 
-Sixteen failure patterns, each one recorded because it happened here, most of
-them more than once. They are ordered by how much they have cost.
+Eighteen failure patterns, each one recorded because it happened here, most
+of them more than once. They are ordered by how much they have cost.
 
 ---
 
@@ -286,3 +286,41 @@ figures are written down by hand before every repack, because nothing can read
 them back afterwards.
 
 See [05 — Shipping](05_shipping.md).
+
+## 17. ⛔ A filter added to a reader redefines what the reader reads
+
+One ERP installation serves three separate bodies — a workers' voluntary
+association, a church, and TSSFL — and `view_audit_log()` gained a module scope
+so that each body's Admin stopped reading the other two's entries. Underneath
+it, three readers each took a **fixed** window and filtered afterwards: the
+last 50 lines, the last 200 KB, the whole file.
+
+So *"the last 50 entries"* quietly became *"whichever of the last 50 entries
+are mine"*. A body with one entry in the file's last fifty lines would open its
+own audit log and be shown **one line** — its history present in the file,
+absent from the screen, and nothing on the screen saying so. The window now
+**grows** (50 → 200 → 800 lines) until it holds N visible lines or reaches the
+file cap.
+
+> `N` was defined on the unfiltered sequence, and the filter moved the sequence
+> out from under it. Ask this of every tail, paginator, "recent" list and
+> `LIMIT` that later acquires a `WHERE`.
+
+## 18. ⚠️ Hiding a row and admitting it exists are two different disclosures
+
+The same scoped view withholds two kinds of line and deliberately treats them
+differently:
+
+| Line | Hidden | Counted |
+|---|---|---|
+| No module tag — logins, backups, user changes, and everything written before tagging existed | yes | **yes** — *"3 earlier entries are not shown"* |
+| Another body's entry | yes | **no** |
+
+Untagged history is the installation's own, and a reader who meets a gap with
+no explanation reads it as a broken log. But a count of **another body's**
+lines would tell the church's administrator how many entries the workers'
+association wrote this week — which is precisely what the scope exists to
+withhold.
+
+> Volume is information. Decide separately whether a reader may see a row and
+> whether they may learn that it exists.
